@@ -75,7 +75,7 @@ Proposed Directory Structure:
 
 - c-snow
     - download
-     - s1_imgs.py
+        - s1_imgs.py
      - ancillary_data.py
     - constants
      - CONSTANTS.py  
