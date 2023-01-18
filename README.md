@@ -71,7 +71,7 @@ s1_sd = get_s1_snow_depth(area, dates, output_netcdf)
 s1_sd.sel(time = "2020-01-01").plot()
 ```
 
-Proposed Directory Structure:
+## Proposed Directory Structure:
 
 - c-snow
     - download
@@ -116,7 +116,7 @@ Don't forget to give the project a star! Thanks again!
 
 ## License
 
-Distributed under the MIT License. See `LICENSE.txt` for more information.
+Distributed under the MIT License. See `LICENSE` for more information.
 
 ## Acknowledgments
 
