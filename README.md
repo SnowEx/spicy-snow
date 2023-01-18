@@ -124,4 +124,4 @@ Project Link: https://github.com/SnowEx/c-snow
 [issues-url]: https://github.com/SnowEx/c-snow/issues
 
 [license-shield]: https://img.shields.io/badge/License-MIT-blue
-[license-url]: https://github.com/SnowEx/c-snow/LICENSE
+[license-url]: https://github.com/SnowEx/c-snow/blob/main/LICENSE
