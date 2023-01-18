@@ -74,10 +74,19 @@ s1_sd.sel(time = "2020-01-01").plot()
 Proposed Directory Structure:
 
 - c-snow
-    - s1_imgs.py
-    - ancillary_data.py
-    - processing.py
-    - output.py
+    - download
+     - s1_imgs.py
+     - ancillary_data.py
+    - constants
+     - CONSTANTS.py  
+    - processing
+     - preprocessing.py
+     - snow_index.py
+     - wet_snow_mask.py
+     - get_s1_snowdepth.py
+    - IO
+     - user_input.py
+     - netcdf_export.py
 - notebooks
     - basic_example.ipynb
 - tests
