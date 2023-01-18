@@ -128,6 +128,9 @@ Zach Keskinen: zachary.keskinen@boisestate.edu
 
 Project Link: https://github.com/SnowEx/c-snow
 
+## Links to relevant repos
+https://github.com/ericlindsey/sentinel_query_download
+
 <!-- MARKDOWN LINKS & IMAGES -->
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
 [contributors-shield]: https://img.shields.io/badge/Contributers-0-green
