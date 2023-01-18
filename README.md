@@ -35,9 +35,23 @@ Example usage:
 
 ```python
 from c_snow import get_s1_snow_depth, bounding_box
+import rioxarray as rxa
 
-area = bounding_box() # pop up for user to draw or coordinates can be provided with bounding_box(lower_left, upper_left, upper_right, lower_right)
-output_netcdf = '/filepath/to/output.netcdf'
-get_s1_snow_depth(area, output_netcdf)
+# Provide bounding box (user popup or user-provided coordinates)
+area = bounding_box() # pop up for user to draw
+area = bounding_box(lower_left, upper_left, upper_right, lower_right) # or provide coordinates
+
+# Provide output filename for netcdf
+output_netcdf = '/filepath/to/output.netcdf' # should this overwrite file?
+
+# Provide dates as tuple of strings
+dates = ("2019-12-01", "2020-04-01")
+
+# Function to actually get data, run processing, returns xarray dataset w/ daily time dimension
+s1_sd = get_s1_snow_depth(area, dates, output_netcdf) 
+# optional keyword ideas: resolution, overwrite, fitting parameters (A, B, C)
+
+# plot first day of 2020 to check data quality
+s1_sd.sel(time = "2020-01-01").plot()
 ```
 
