@@ -76,9 +76,18 @@ s1_sd.sel(time = "2020-01-01").plot()
 - c-snow
     - download
         - s1_imgs.py
+            - s1_img_search(area: shapely geom, dates: (string, string)) -> pd dataframe : find dates and url of s1 overpasses
+            - download_s1_imgs(urls: pd dataframe) -> xarray : takes urls of s1 images and download them and return xarray dataset of s1 images
         - ancillary_data.py
+            - snow_cover_search(area: shapely geom, dates: (string, string)) -> pd dataframe : find url of IMS snow on/off images
+            - download_snow_cover_imgs(urls: pd dataframe, s1_dataset: xarray dataset) -> xarray : takes urls of IMS snow on/off images and download them and adds to the sentinel 1 xarray dataset as a variable/band
+            - fcf_search(area: shapely geom, dates: (string, string)) -> pd dataframe : find url of PROBA-V forest cover fraction images
+            - download_fcf_imgs(urls: pd dataframe, s1_dataset: xarray dataset) -> xarray : takesPROBA-V forest cover fraction images and download them and adds to the sentinel 1 xarray dataset as a variable/band
     - constants
-        - CONSTANTS.py  
+        - CONSTANTS.py - constants to be used (resolution standards, band/variable names, etc)
+    - utils - function to be used in multiple places
+        - download_utils.py
+        - radar_utils.py
     - processing
         - preprocessing.py
         - snow_index.py
