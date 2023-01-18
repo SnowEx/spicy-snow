@@ -13,7 +13,11 @@ Lievens et al 2021 - https://tc.copernicus.org/articles/16/159/2022/
 
 ## Proposed Roadmap
 
-- [ ] Inputs: 
+- [ ] Design planning
+- [ ] Pseudo-code
+- [ ] Tests
+
+- [ ] User Inputs: 
     - [ ] dates 
     - [ ] geographic area
     - [ ] others?
