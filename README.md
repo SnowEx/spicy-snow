@@ -76,17 +76,17 @@ Proposed Directory Structure:
 - c-snow
     - download
         - s1_imgs.py
-     - ancillary_data.py
+        - ancillary_data.py
     - constants
-     - CONSTANTS.py  
+        - CONSTANTS.py  
     - processing
-     - preprocessing.py
-     - snow_index.py
-     - wet_snow_mask.py
-     - get_s1_snowdepth.py
+        - preprocessing.py
+        - snow_index.py
+        - wet_snow_mask.py
+        - get_s1_snowdepth.py
     - IO
-     - user_input.py
-     - netcdf_export.py
+        - user_input.py
+        - netcdf_export.py
 - notebooks
     - basic_example.ipynb
 - tests
