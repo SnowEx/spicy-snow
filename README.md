@@ -16,7 +16,7 @@ Lievens et al 2021 - https://tc.copernicus.org/articles/16/159/2022/
 - [ ] Inputs: 
     - [ ] dates 
     - [ ] geographic area
-    - [ ]others?
+    - [ ] others?
 
 - [ ] Data products to pull in:
     - [ ] Sentinel 1 - orbit file, border noise, thermal noise, radiometric calibration, terrain flattened, gamma_0, range dopper terrain correction, averaged to 100m, mask out incidence angles >70
@@ -105,13 +105,13 @@ Don't forget to give the project a star! Thanks again!
 
 Distributed under the MIT License. See `LICENSE.txt` for more information.
 
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
 ## Acknowledgments
 
 Readme template: https://github.com/othneildrew/Best-README-Template
 
 ## Contact
+
+Zach Keskinen: zachary.keskinen@boisestate.edu
 
 Project Link: https://github.com/SnowEx/c-snow
 
