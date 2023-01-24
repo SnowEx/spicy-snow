@@ -1,0 +1,7 @@
+name: c-snow
+channels:
+ - conda-forge
+ - defaults
+dependencies:
+ - numpy
+ - hyp3_sdk
