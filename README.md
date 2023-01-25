@@ -76,10 +76,10 @@ s1_sd.sel(time = "2020-01-01").plot()
 - c-snow
     - download
         - s1_imgs.py
-            * s1_img_search(area: shapely geom, dates: pd_time_slice) -> pd dataframe : find dates and url of s1 overpasses
+            * s1_img_search(area: shapely geom, dates: pd_time_slice) -> pd dataframe : find dates and url of s1 overpasses and returns granule names
                 - https://hyp3-docs.asf.alaska.edu/using/sdk_api/
                 - https://nbviewer.org/github/ASFHyP3/hyp3-sdk/blob/main/docs/sdk_example.ipynb
-            * download_s1_imgs(urls: pd dataframe) -> xarray : takes urls of s1 images and download them and return xarray dataset of s1 images
+            * download_s1_imgs(urls: pd dataframe) -> xarray : takes granule names of s1 images and download them and return xarray dataset of s1 images
         - ancillary_data.py
             * snow_cover_search(area: shapely geom, dates: (string, string)) -> pd dataframe : find url of IMS snow on/off images
             * download_snow_cover_imgs(urls: pd dataframe, s1_dataset: xarray dataset) -> xarray : takes urls of IMS snow on/off images and download them and adds to the sentinel 1 xarray dataset as a variable/band
@@ -116,6 +116,9 @@ s1_sd.sel(time = "2020-01-01").plot()
     - basic_example.ipynb
 - tests
     - test_data
+        - expected_output_dataset.pkl
+        - expected_input_dataset.pkl
+    - test_downloads.py
     - test_inputs.py
     - test_processing.py
     - test_outputs.py

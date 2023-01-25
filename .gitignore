@@ -131,7 +131,7 @@ dmypy.json
 # MacOs
 *DS_Store
 # Individual Contibutors
-contrib/*
+*data/
 
 #image types
 *.zip

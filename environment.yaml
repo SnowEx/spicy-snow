@@ -6,6 +6,7 @@ dependencies:
  - numpy
  - pandas
  - xarray
+ - shapely
  - rioxarray
  - hyp3_sdk
  - asf_search
