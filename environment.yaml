@@ -4,4 +4,9 @@ channels:
  - defaults
 dependencies:
  - numpy
+ - pandas
+ - xarray
+ - rioxarray
  - hyp3_sdk
+ - asf_search
+ - matplotlib

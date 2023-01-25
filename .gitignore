@@ -128,5 +128,12 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
+# MacOs
+*DS_Store
 # Individual Contibutors
 contrib/*
+
+#image types
+*.zip
+*.gz
+*.asc
