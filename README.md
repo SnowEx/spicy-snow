@@ -2,8 +2,8 @@
 [![Issues][issues-shield]][issues-url]
 [![MIT License][license-shield]][license-url]
 
-# c-snow
-Collaboration to make a python module to use volumetric scattering at C-band to calculate snow depths from Sentinel-1 imagery using Hans Lieven et al.'s 2021 technique
+# spicy-snow
+Python module to use volumetric scattering at C-band to calculate snow depths from Sentinel-1 imagery using Hans Lieven et al.'s 2021 technique
 
 Lievens et al 2019 - https://www.nature.com/articles/s41467-019-12566-y
 - the original nature paper. Methods are at the bottom.
@@ -50,7 +50,7 @@ pip install c_snow
 ## Example usage:
 
 ```python
-from c_snow import get_s1_snow_depth, bounding_box
+from spicy-snow import get_s1_snow_depth, bounding_box
 import rioxarray as rxa
 
 # Provide bounding box (user popup or user-provided coordinates)
@@ -155,7 +155,7 @@ Readme template: https://github.com/othneildrew/Best-README-Template
 
 Zach Keskinen: zachary.keskinen@boisestate.edu
 
-Project Link: https://github.com/SnowEx/c-snow
+Project Link: https://github.com/SnowEx/spicy-snow
 
 ## Links to relevant repos
 Sentinel 1 Download:
@@ -172,10 +172,10 @@ https://zenodo.org/record/3939050/files/PROBAV_LC100_global_v3.0.1_2019-nrt_Tree
 <!-- MARKDOWN LINKS & IMAGES -->
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
 [contributors-shield]: https://img.shields.io/badge/Contributers-0-green
-[contributors-url]: https://github.com/SnowEx/c-snow/graphs/contributors
+[contributors-url]: https://github.com/SnowEx/spicy-snow/graphs/contributors
 
 [issues-shield]: https://img.shields.io/badge/Issues-0-yellowgreen
-[issues-url]: https://github.com/SnowEx/c-snow/issues
+[issues-url]: https://github.com/SnowEx/spicy-snow/issues
 
 [license-shield]: https://img.shields.io/badge/License-MIT-blue
-[license-url]: https://github.com/SnowEx/c-snow/blob/main/LICENSE
+[license-url]: https://github.com/SnowEx/spicy-snow/blob/main/LICENSE

@@ -1,4 +1,4 @@
-name: c-snow
+name: spicy
 channels:
  - conda-forge
  - defaults
@@ -6,8 +6,8 @@ dependencies:
  - numpy
  - pandas
  - xarray
- - shapely
  - rioxarray
+ - shapely
  - hyp3_sdk
  - asf_search
  - matplotlib
