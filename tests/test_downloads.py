@@ -7,8 +7,9 @@ import pickle
 import pandas.testing as pd_testing
 
 import sys
-sys.path.append('./spicy-snow')
-from download.sentinel1 import s1_img_search#, download_s1_imgs
+from os.path import expanduser
+sys.path.append(expanduser('~/Documents/spicy-snow'))
+from spicy_snow.download.sentinel1 import s1_img_search#, download_s1_imgs
 
 class TestSentinel1Search(unittest.TestCase):
     """
