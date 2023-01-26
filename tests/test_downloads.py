@@ -9,7 +9,7 @@ import pandas.testing as pd_testing
 import sys
 from os.path import expanduser
 sys.path.append(expanduser('~/Documents/spicy-snow'))
-from spicy_snow.download.sentinel1 import s1_img_search#, download_s1_imgs
+from spicy_snow.download.sentinel1 import s1_img_search, download_s1_imgs
 
 class TestSentinel1Search(unittest.TestCase):
     """
@@ -73,46 +73,31 @@ class TestSentinel1Search(unittest.TestCase):
 #     Test functionality of downloading sentinel-1 images from url search results.
 #     """
 
-#     # TODO Create expected result dataframe (same as above)
-#     urls = pd.DataFrame()
-#     s1_dataset = download_s1_imgs(urls)
+#     # Create expected result dataframe (same as above)
+#     with open('./tests/test_data/search_result.pkl', 'rb') as f:
+#         search_results = pickle.load(f)
+#     s1_dataset = download_s1_imgs(search_results.iloc[:2])
 
 #     def test_download_return_type(self, dataset = s1_dataset):
 #         """
 #         Test return type of Sentinel-1 download
 #         """
-#         self.assertEqual(type(dataset), xarray.Dataset, "Download results should return xarray Dataset")
+#         self.assertEqual(type(dataset), xarray.DataArray, "Download results should return xarray Dataset")
     
 #     def test_download_return_number(self, dataset = s1_dataset):
 #         """
 #         Test if sentinel-1 download returns expected number of results
 #         """
-#         # TODO Add in expected number of Sentinel-1 images
-#         self.assertEqual(len(dataset), XXX, "Download dataset should contain XXX images")
+#         # Add in expected number of Sentinel-1 images
+#         self.assertEqual(len(dataset), 2, "Download dataset should contain 2 images")
     
 #     def test_download_return_values(self, dataset = s1_dataset):
 #         """
 #         Test if sentinel-1 download returns correct images in dataframe
 #         """
-#         # TODO Add in expected results
+#         # Add in expected results
 #         expected_result = xarray.Dataset()
 #         self.assertEqual(dataset, expected_result, "Download result should match.")
-    
-#     def test_download_exceptions(self, urls = urls):
-#         """
-#         Test thrown exceptions/errors in sentinel 1 image downloads
-#         """
-#         # Incorrect number/type of inputs
-#         self.assertRaises(ValueError, download_s1_imgs(1))
-#         self.assertRaises(ValueError, download_s1_imgs('1'))
-#         self.assertRaises(ValueError, download_s1_imgs(True))
-
-#         # TODO Logical errors in inputs
-#         # urls are invalid
-#         incorrect_urls = pd.DataFrame()
-#         self.assertRaises(XXXX_Error, download_s1_imgs(incorrect_urls), "Incorrect urls should return error")
-#         empty_urls = pd.DataFrame()
-#         self.assertRaises(XXXX_Error, download_s1_imgs(empty_urls), "Empty dataset should return error")
 
 if __name__ == '__main__':
     unittest.main()

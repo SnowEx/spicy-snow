@@ -78,12 +78,7 @@ def download_s1_imgs(search_results: pd.DataFrame, out_dir: str, job_name: str =
         # https://hyp3-docs.asf.alaska.edu/using/sdk_api/#hyp3_sdk.hyp3.HyP3.submit_rtc_job
         rtc_jobs += hyp3.submit_rtc_job(g, name = job_name, include_inc_map = True,\
             scale = 'amplitude', dem_matching = False, resolution = 30)
-    pbar = tqdm(total = len(rtc_jobs))
-    while not rtc_jobs.complete():
-        # to get updated information
-        pbar.update(len(rtc_jobs.filter_jobs(succeeded=True, running=False, failed=True)))
-        rtc_jobs = hyp3.refresh(rtc_jobs)
-    pbar.close()
+    hyp3.watch(rtc_jobs)
 
     failed_jobs = rtc_jobs.filter_jobs(succeeded=False, running=False, failed=True)
     if len(failed_jobs) > 0:

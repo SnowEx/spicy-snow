@@ -1,6 +1,10 @@
 """
 Utility functions for downloading files
 """
+import sys
+import time
+from os.path import basename, exists
+from urllib.request import urlretrieve
 
 def reporthook(count, block_size, total_size):
     """
