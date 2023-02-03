@@ -137,3 +137,8 @@ dmypy.json
 *.zip
 *.gz
 *.asc
+*.nc
+*.tif
+
+#data directory
+data/

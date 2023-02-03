@@ -5,6 +5,7 @@ Functions to search and download Sentinel-1 images for specific geometries and d
 import sys
 import os
 from os.path import basename, exists, expanduser, join
+import shutil
 import asf_search as asf
 import pandas as pd
 import xarray as xr
@@ -29,7 +30,7 @@ def s1_img_search(area: shapely.geometry.box, dates: (str, str)) -> pd.DataFrame
     Returns:
     granules: Dataframe of Sentinel-1 granule names to download.
     """
-    # TODO Error Checking
+    # Error Checking
     if len(dates) != 2:
         raise TypeError("Provide at start and end date in format (YYYY-MM-DD, YYYY_MM_DD)")
     if type(area) != shapely.geometry.polygon.Polygon:
@@ -53,17 +54,19 @@ def s1_img_search(area: shapely.geometry.box, dates: (str, str)) -> pd.DataFrame
     results = pd.json_normalize(results.geojson(), record_path = ['features'])
     return results
 
-def download_s1_imgs(search_results: pd.DataFrame, out_dir: str, job_name: str = 'zk-s1-snow') -> xr.DataArray:
+def hyp3_pipeline(search_results: pd.DataFrame, job_name, existing_job_name = False) -> sdk.jobs.Batch:
     """
-    Download rtc Sentinel-1 images from Hyp3 pipeline.
+    Start and monitor Hyp3 pipeline for desired Sentinel-1 granules
     https://hyp3-docs.asf.alaska.edu/using/sdk_api/
 
     Args:
-    search_results: Dataframe of asf_search Sentinel-1 granules to download
+    search_results: Pandas Dataframe of asf_search search results.
+    job_name: name to give hyp3 batch run
+    existing_job_name: if you have an existing job that you want to find and reuse [default: False]
 
     Returns:
-    s1_dataset: Xarray dataset of Sentinel-1 backscatter and incidence angle
-    """
+    rtc_jobs: Hyp3 batch object of completed jobs.
+    """ 
     try:
         # .netrc
         hyp3 = sdk.HyP3()
@@ -71,21 +74,46 @@ def download_s1_imgs(search_results: pd.DataFrame, out_dir: str, job_name: str =
         # prompt for password
         hyp3 = sdk.HyP3(prompt = True)
 
+    if existing_job_name:
+        rtc_jobs = hyp3.find_jobs(name = existing_job_name)
+        if len(rtc_jobs.filter_jobs(succeeded = False, failed = False)) > 0:
+            hyp3.watch(rtc_jobs.filter_jobs(succeeded = False, failed = False))
+        return rtc_jobs.filter_jobs(succeeded = True)
+
     granules = search_results['properties.sceneName']
 
     rtc_jobs = sdk.Batch()
-    for g in granules:
+    for g in tqdm(granules, desc = 'Submitting Jobs'):
         # https://hyp3-docs.asf.alaska.edu/using/sdk_api/#hyp3_sdk.hyp3.HyP3.submit_rtc_job
         rtc_jobs += hyp3.submit_rtc_job(g, name = job_name, include_inc_map = True,\
             scale = 'amplitude', dem_matching = False, resolution = 30)
+
     hyp3.watch(rtc_jobs)
+
+    rtc_jobs = hyp3.refresh(rtc_jobs)
 
     failed_jobs = rtc_jobs.filter_jobs(succeeded=False, running=False, failed=True)
     if len(failed_jobs) > 0:
         print(f'Some jobs failed. Number of failed jobs: {len(failed_jobs)}')
     
+    return rtc_jobs.filter_jobs(succeeded = True)
+
+def hyp3_jobs_to_dataArray(jobs: sdk.jobs.Batch, area: shapely.geometry.box, outdir: str, clean = True) -> xr.DataArray:
+    """
+    Download rtc Sentinel-1 images from Hyp3 pipeline.
+    https://hyp3-docs.asf.alaska.edu/using/sdk_api/
+
+    Args:
+    jobs: hyp3 Batch object of completed jobs
+    outdir: directory to save tif files.
+    clean: clean up tiffs after creating DataArray [default: True]
+
+    Returns:
+    da: DataArray of Sentinel VV+VH and incidence angle
+    """
+    os.makedirs(outdir, exist_ok = True)
     das = []
-    for i, job in enumerate(rtc_jobs[:2]):
+    for job in tqdm(jobs, desc = 'Downloading S1 to DataArray'):
         u = job.files[0]['url']
         granule = job.job_parameters['granules'][0]
         urls = {}
@@ -93,41 +121,55 @@ def download_s1_imgs(search_results: pd.DataFrame, out_dir: str, job_name: str =
         urls[f'{granule}_VH'] = u.replace('.zip', '_VH.tif')
         urls[f'{granule}_inc'] = u.replace('.zip', '_inc_map.tif')
         for j, (name, url) in enumerate(urls.items()):
-            url_download(url, join(out_dir,f'{name}.tif'))
-            img = rxa.open_rasterio(join(out_dir,f'{name}.tif').rio.clip([area], 'EPSG:4326'))
+            url_download(url, join(outdir, f'{name}.tif'), verbose = False)
+            img = rxa.open_rasterio(join(outdir, f'{name}.tif')).rio.clip([area], 'EPSG:4326')
             img = img.rio.reproject('EPSG:4326')
             band_name = name.replace(f'{granule}_', '')
             img = img.assign_coords(time = pd.to_datetime(granule.split('_')[4]))
             if j == 0:
                 da = img.assign_coords(band = [band_name])
-                da.attrs["long_name"] = granule
-                da.attrs["mission"] = granule.split('_')[0]
-                da.attrs["mode"] = granule.split('_')[1]
-                da.attrs["product-type"] = granule.split('_')[2][:3]
-                da.attrs["resolution"] = granule.split('_')[2][3]
-                da.attrs["processing-level"] = granule.split('_')[3][0]
-                da.attrs["product-class"] = granule.split('_')[3][1]
-                da.attrs["polarization-type"] = granule.split('_')[3][2:]
-                da.attrs["start-time"] = pd.to_datetime(granule.split('_')[4])
-                da.attrs["end-time"] = pd.to_datetime(granule.split('_')[5])
-                da.attrs["absolute-orbit"] = granule.split('_')[6]
-                da.attrs["take-id"] = granule.split('_')[7]
-                da.attrs["unique-id"] = granule.split('_')[8]
+
             else:
                 da = xr.concat([da, img.assign_coords(band = [band_name])], dim = 'band')
         das.append(da)
+    return das
+    
     da = xr.concat(das, dim = 'time')
+
+    if clean:
+        shutil.rmtree(outdir)
+
     return da
 
+def download_s1_imgs(search_results: pd.DataFrame, area: shapely.geometry.box, job_name: str = 'sentinel-1-snow-depth', tmp_dir = './tmp') -> xr.Dataset:
+    """
+    Download rtc Sentinel-1 images from Hyp3 pipeline.
+    https://hyp3-docs.asf.alaska.edu/using/sdk_api/
+
+    Args:
+    search_results: Dataframe of asf_search Sentinel-1 granules to download
+    job_name: job_name to use for hyp3 cloud processing. [default: 'sentinel-1-snow-depth]
+    tmp_dir: temporary directory to save tifs to
+
+    Returns:
+    s1_dataset: Xarray dataset of Sentinel-1 backscatter and incidence angle
+    """
+    rtc_jobs = hyp3_pipeline(search_results = search_results, job_name = job_name, existing_job_name = False)
+    s1_dataArray = hyp3_jobs_to_dataArray(jobs = rtc_jobs, area = area, outdir = tmp_dir, clean = False)
+    # s1_dataset = s1_dataArray.to_dataset(name = 's1', promote_attrs = True)
+    # s1_dataset.to_netcdf(out_fp)
+    s1_dataset = s1_dataArray
+    return s1_dataset
 
 if __name__ == '__main__':
     area = shapely.geometry.box(-114.4, 43, -114.3, 43.1)
     dates = ('2019-12-28', '2020-02-02')
     search_results = s1_img_search(area, dates)
     # print(search_results)
-    # import pickle
+    import pickle
     # with open('/Users/zachkeskinen/Documents/spicy-snow/tests/test_data/search_result.pkl', 'wb') as f:
     #     pickle.dump(search_results, f)
-    da = download_s1_imgs(search_results, out_dir = '/Users/zachkeskinen/Documents/spicy-snow/contrib/keskinen/data')
+    da = download_s1_imgs(search_results, out_fp = '/Users/zachkeskinen/Documents/spicy-snow/contrib/keskinen/data/test.nc', job_name = 'test2-zk')
     print(da)
-
+    with open('/Users/zachkeskinen/Documents/spicy-snow/tests/test_data/s1_da.pkl', 'wb') as f:
+        pickle.dump(da, f)

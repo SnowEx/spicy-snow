@@ -4,6 +4,7 @@ Utility functions for downloading files
 import sys
 import time
 from os.path import basename, exists
+import gzip
 from urllib.request import urlretrieve
 
 def reporthook(count, block_size, total_size):
@@ -22,11 +23,27 @@ def reporthook(count, block_size, total_size):
                     (percent, progress_size / (1024 * 1024), speed, duration))
     sys.stdout.flush()
 
-def url_download(url, out_fp, overwrite = False):
+def url_download(url, out_fp, overwrite = False, verbose = True):
     """
     Downloads url with a progress bar and overwrite check.
     """
     if not exists(out_fp) or overwrite == True:
-        print(f'Downloading {basename(out_fp)}.')
-        urlretrieve(url, out_fp, reporthook)
-        print('')
+        if verbose:
+            print(f'Downloading {basename(out_fp)}.')
+            urlretrieve(url, out_fp, reporthook)
+            print('')
+        else:
+            urlretrieve(url, out_fp)
+    else:
+        if verbose:
+            print(f'{basename(out_fp)} already exists. Skipping.')
+
+def decompress(infile, tofile):
+    """
+    Decompress gzipped infile to outfile location.
+    """
+    with open(infile, 'rb') as inf, open(tofile, 'wb') as ouf:
+        decom_str = gzip.decompress(inf.read())
+        ouf.write(decom_str)
+
+        return tofile
