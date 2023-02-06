@@ -10,6 +10,7 @@ import asf_search as asf
 import pandas as pd
 import xarray as xr
 import rioxarray as rxa
+from rioxarray.merge import merge_arrays
 import shapely.geometry
 from datetime import date
 from tqdm import tqdm
@@ -51,6 +52,11 @@ def s1_img_search(area: shapely.geometry.box, dates: (str, str)) -> pd.DataFrame
     # get results
     results = asf.geo_search(platform = [asf.PLATFORM.SENTINEL1], intersectsWith = area.wkt,\
         start = dates[0], end = dates[1], processingLevel = asf.PRODUCT_TYPE.GRD_HD)
+
+    # TODO check with 0 results.
+    if len(results) == 0:
+        raise ValueError("No search results found.")
+
     results = pd.json_normalize(results.geojson(), record_path = ['features'])
     return results
 
@@ -78,6 +84,8 @@ def hyp3_pipeline(search_results: pd.DataFrame, job_name, existing_job_name = Fa
         rtc_jobs = hyp3.find_jobs(name = existing_job_name)
         if len(rtc_jobs.filter_jobs(succeeded = False, failed = False)) > 0:
             hyp3.watch(rtc_jobs.filter_jobs(succeeded = False, failed = False))
+
+        rtc_jobs = hyp3.refresh(rtc_jobs)
         return rtc_jobs.filter_jobs(succeeded = True)
 
     granules = search_results['properties.sceneName']
@@ -88,13 +96,14 @@ def hyp3_pipeline(search_results: pd.DataFrame, job_name, existing_job_name = Fa
         rtc_jobs += hyp3.submit_rtc_job(g, name = job_name, include_inc_map = True,\
             scale = 'amplitude', dem_matching = False, resolution = 30)
 
+    print(f'Watching {len(rtc_jobs)}. This may take awhile...')
     hyp3.watch(rtc_jobs)
 
     rtc_jobs = hyp3.refresh(rtc_jobs)
 
     failed_jobs = rtc_jobs.filter_jobs(succeeded=False, running=False, failed=True)
     if len(failed_jobs) > 0:
-        print(f'Some jobs failed. Number of failed jobs: {len(failed_jobs)}')
+        print(f'{len(failed_jobs)} jobs failed.')
     
     return rtc_jobs.filter_jobs(succeeded = True)
 
@@ -113,35 +122,41 @@ def hyp3_jobs_to_dataArray(jobs: sdk.jobs.Batch, area: shapely.geometry.box, out
     """
     os.makedirs(outdir, exist_ok = True)
     das = []
+    granules = []
     for job in tqdm(jobs, desc = 'Downloading S1 to DataArray'):
         u = job.files[0]['url']
         granule = job.job_parameters['granules'][0]
+        if granule in granules:
+            continue
+        granules.append(granule)
+
         urls = {}
         urls[f'{granule}_VV'] = u.replace('.zip', '_VV.tif')
         urls[f'{granule}_VH'] = u.replace('.zip', '_VH.tif')
         urls[f'{granule}_inc'] = u.replace('.zip', '_inc_map.tif')
+
+        imgs = []
         for j, (name, url) in enumerate(urls.items()):
             url_download(url, join(outdir, f'{name}.tif'), verbose = False)
-            img = rxa.open_rasterio(join(outdir, f'{name}.tif')).rio.clip([area], 'EPSG:4326')
+            img = rxa.open_rasterio(join(outdir, f'{name}.tif'))
             img = img.rio.reproject('EPSG:4326')
+            img = img.rio.clip([area], 'EPSG:4326')
             band_name = name.replace(f'{granule}_', '')
             img = img.assign_coords(time = pd.to_datetime(granule.split('_')[4]))
-            if j == 0:
-                da = img.assign_coords(band = [band_name])
-
-            else:
-                da = xr.concat([da, img.assign_coords(band = [band_name])], dim = 'band')
+            imgs.append(img.assign_coords(band = [band_name]))
+        da = xr.concat(imgs, dim = 'band')
+        if das:
+            da = da.rio.reproject_match(das[0])
         das.append(da)
-    return das
-    
-    da = xr.concat(das, dim = 'time')
+
+    full_da = xr.concat(das, dim = 'time')
 
     if clean:
         shutil.rmtree(outdir)
 
-    return da
+    return full_da
 
-def download_s1_imgs(search_results: pd.DataFrame, area: shapely.geometry.box, job_name: str = 'sentinel-1-snow-depth', tmp_dir = './tmp') -> xr.Dataset:
+def download_s1_imgs(search_results: pd.DataFrame, area: shapely.geometry.box, job_name: str = 'sentinel-1-snow-depth', tmp_dir = './tmp', existing_job_name = False) -> xr.Dataset:
     """
     Download rtc Sentinel-1 images from Hyp3 pipeline.
     https://hyp3-docs.asf.alaska.edu/using/sdk_api/
@@ -154,11 +169,10 @@ def download_s1_imgs(search_results: pd.DataFrame, area: shapely.geometry.box, j
     Returns:
     s1_dataset: Xarray dataset of Sentinel-1 backscatter and incidence angle
     """
-    rtc_jobs = hyp3_pipeline(search_results = search_results, job_name = job_name, existing_job_name = False)
+    rtc_jobs = hyp3_pipeline(search_results = search_results, job_name = job_name, existing_job_name = existing_job_name)
     s1_dataArray = hyp3_jobs_to_dataArray(jobs = rtc_jobs, area = area, outdir = tmp_dir, clean = False)
-    # s1_dataset = s1_dataArray.to_dataset(name = 's1', promote_attrs = True)
+    s1_dataset = s1_dataArray.to_dataset(name = 's1', promote_attrs = True)
     # s1_dataset.to_netcdf(out_fp)
-    s1_dataset = s1_dataArray
     return s1_dataset
 
 if __name__ == '__main__':

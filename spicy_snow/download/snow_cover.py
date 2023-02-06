@@ -52,8 +52,8 @@ def download_snow_cover(dataset: xr.Dataset, tmp_dir: str = './tmp', clean: bool
     None
     """
     days = [pd.to_datetime(d) for d in dataset.time.values]
-    for day in tqdm(days):
-        ims = get_ims_day_data(day.year, f'{day.day:03}', tmp_dir = tmp_dir) #revert to clean = True at somepoint
+    for day in tqdm(days, desc = 'Downloading IMS snow-cover'):
+        ims = get_ims_day_data(day.year, f'{day.dayofyear:03}', tmp_dir = tmp_dir) #revert to clean = True at somepoint
         dataset = add_ims_data(dataset, ims, day)
     
     if clean == True:
@@ -70,9 +70,9 @@ def add_ims_data(dataset: xr.Dataset, ims: xr.DataArray, date: pd.Timestamp) -> 
     ims: IMS dataArray for one days worth of data
     date: Date of IMS retrieval
     """
-    transformer = Transformer.from_crs(4326, 9001, always_xy=True)
-    polar_bounds = transformer.transform(*dataset['s1'].rio.bounds())
-    ims = ims.rio.clip_box(*polar_bounds)
+    # transformer = Transformer.from_crs(4326, 9001, always_xy=True)
+    # polar_bounds = transformer.transform(*dataset['s1'].rio.bounds())
+    # ims = ims.rio.clip_box(*polar_bounds)
     ims = ims.rio.reproject_match(dataset['s1'])
     ims = ims.assign_coords(time = [date])
     dataset = xr.merge([dataset, ims.rename('ims')])
