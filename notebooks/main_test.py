@@ -20,22 +20,22 @@ area = shapely.geometry.box(-115, 43, -114, 44)
 skip = False
 
 if not skip:
+    os.makedirs('../data' , exist_ok = True)
     # get asf_search search results
     search_results = s1_img_search(area, dates)
     print(f'Found {len(search_results)} results')
 
     # download s1 images into dataset ['s1'] keyword
-    ds = download_s1_imgs(search_results, area, tmp_dir = '/Users/zachkeskinen/Documents/spicy-snow/data/tmp', job_name = '2019-2020', existing_job_name = False)
+    ds = download_s1_imgs(search_results, area, tmp_dir = '../data/tmp', job_name = '2019-2020', existing_job_name = 'rtc-example')
 
     # download IMS snow cover and add to dataset ['ims'] keyword
-    ds = download_snow_cover(ds, tmp_dir = '/Users/zachkeskinen/Documents/spicy-snow/data/tmp/', clean = False)
+    ds = download_snow_cover(ds, tmp_dir = '../data/tmp/', clean = False)
 
     # download fcf and add to dataset ['fcf'] keyword
     fcf = download_fcf('/Users/zachkeskinen/Documents/spicy-snow/data/fcf.tif')
     ds = add_fcf(ds, fcf)
 
     # dump completed dataset to data directory
-    os.makedirs('../data' , exist_ok = True)
 
     with open('../data/main_test.pkl', 'wb') as f:
         ds = pickle.dump(ds, f)
