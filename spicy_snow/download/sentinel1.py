@@ -91,7 +91,7 @@ def hyp3_pipeline(search_results: pd.DataFrame, job_name, existing_job_name = Fa
     granules = search_results['properties.sceneName']
 
     rtc_jobs = sdk.Batch()
-    for g in tqdm(granules, desc = 'Submitting Jobs'):
+    for g in tqdm(granules, desc = 'Submitting s1 jobs'):
         # https://hyp3-docs.asf.alaska.edu/using/sdk_api/#hyp3_sdk.hyp3.HyP3.submit_rtc_job
         rtc_jobs += hyp3.submit_rtc_job(g, name = job_name, include_inc_map = True,\
             scale = 'amplitude', dem_matching = False, resolution = 30)
@@ -123,7 +123,7 @@ def hyp3_jobs_to_dataArray(jobs: sdk.jobs.Batch, area: shapely.geometry.box, out
     os.makedirs(outdir, exist_ok = True)
     das = []
     granules = []
-    for job in tqdm(jobs, desc = 'Downloading S1 to DataArray'):
+    for job in tqdm(jobs, desc = 'Downloading S1 images'):
         u = job.files[0]['url']
         granule = job.job_parameters['granules'][0]
         if granule in granules:
