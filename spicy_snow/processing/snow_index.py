@@ -2,7 +2,7 @@
 Functions to calculate delta CR, delta VV, delta gamma, and snow index.
 """
 
-import xarray
+import xarray as xr
 
 def calc_delta_cross_ratio(dataset: xr.Dataset) -> xr.Dataset:
     """

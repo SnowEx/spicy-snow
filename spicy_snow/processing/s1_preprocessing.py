@@ -5,6 +5,7 @@ https://tc.copernicus.org/articles/16/159/2022/#section2
 """
 
 from typing import Dict
+import numpy as np
 import xarray as xr
 
 def s1_amp_to_dB(dataset: xr.Dataset) -> xr.Dataset:
@@ -19,9 +20,9 @@ def s1_amp_to_dB(dataset: xr.Dataset) -> xr.Dataset:
     """
 
     # convert all s1 images from amplitude to dB
-    ds['s1'].loc[dict(band = ['VV','VH'])] = 10*np.log10(ds.sel(band = ['VV','VH'])['s1'])
+    dataset['s1'].loc[dict(band = ['VV','VH'])] = 10*np.log10(dataset.sel(band = ['VV','VH'])['s1'])
 
-    return ds
+    return dataset
 
 def subset_s1_images(dataset: xr.Dataset) -> Dict[xr.Dataset]:
     """
