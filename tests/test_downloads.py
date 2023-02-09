@@ -39,7 +39,7 @@ class TestSentinel1Search(unittest.TestCase):
         Test if sentinel-1 search returns correct images in dataframe
         """
         # Add in expected results
-        with open('./tests/test_data/search_result.pkl', 'rb') as f:
+        with open('./tests/test_data/search_result', 'rb') as f:
             expected_result = pickle.load(f)
         try:
             pd_testing.assert_frame_equal(search_result, expected_result)
