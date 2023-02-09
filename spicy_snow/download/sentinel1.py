@@ -215,15 +215,4 @@ def download_s1_imgs(search_results: pd.DataFrame, area: shapely.geometry.box, j
     # s1_dataset.to_netcdf(out_fp)
     return s1_dataset
 
-if __name__ == '__main__':
-    area = shapely.geometry.box(-114.4, 43, -114.3, 43.1)
-    dates = ('2019-12-28', '2020-02-02')
-    search_results = s1_img_search(area, dates)
-    # print(search_results)
-    import pickle
-    # with open('/Users/zachkeskinen/Documents/spicy-snow/tests/test_data/search_result.pkl', 'wb') as f:
-    #     pickle.dump(search_results, f)
-    da = download_s1_imgs(search_results, out_fp = '/Users/zachkeskinen/Documents/spicy-snow/contrib/keskinen/data/test.nc', job_name = 'test2-zk')
-    print(da)
-    with open('/Users/zachkeskinen/Documents/spicy-snow/tests/test_data/s1_da.pkl', 'wb') as f:
-        pickle.dump(da, f)
+# End of file
