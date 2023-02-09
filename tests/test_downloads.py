@@ -8,8 +8,9 @@ import pandas.testing as pd_testing
 
 import sys
 from os.path import expanduser
-sys.path.append(expanduser('~/Documents/spicy-snow'))
+sys.path.append(expanduser('.'))
 from spicy_snow.download.sentinel1 import s1_img_search, download_s1_imgs
+from spicy_snow.download.forest_cover import download_fcf, add_fcf
 
 class TestSentinel1Search(unittest.TestCase):
     """
@@ -68,36 +69,12 @@ class TestSentinel1Search(unittest.TestCase):
         self.assertRaises(IndexError, s1_img_search, box(-115, -46, -115.5, -46.5), dates)
         self.assertRaises(IndexError, s1_img_search, box(300000, 50000, 300000, 55000), dates)
 
-# class TestSentinel1Download(unittest.TestCase):
-#     """
-#     Test functionality of downloading sentinel-1 images from url search results.
-#     """
-
-#     # Create expected result dataframe (same as above)
-#     with open('./tests/test_data/search_result.pkl', 'rb') as f:
-#         search_results = pickle.load(f)
-#     s1_dataset = download_s1_imgs(search_results.iloc[:2])
-
-#     def test_download_return_type(self, dataset = s1_dataset):
-#         """
-#         Test return type of Sentinel-1 download
-#         """
-#         self.assertEqual(type(dataset), xarray.DataArray, "Download results should return xarray Dataset")
+# class TestFCFDownload(unittest.TestCase):
+#     fcf = download_fcf('./tests/test_data/fcf.tif')
+#     print(os.get_cwd())
     
-#     def test_download_return_number(self, dataset = s1_dataset):
-#         """
-#         Test if sentinel-1 download returns expected number of results
-#         """
-#         # Add in expected number of Sentinel-1 images
-#         self.assertEqual(len(dataset), 2, "Download dataset should contain 2 images")
+#     def test_fcf_return_type(self, fcf = fcf):
+#         self.assertEqual(type(fcf), xarray.DataArray)
     
-#     def test_download_return_values(self, dataset = s1_dataset):
-#         """
-#         Test if sentinel-1 download returns correct images in dataframe
-#         """
-#         # Add in expected results
-#         expected_result = xarray.Dataset()
-#         self.assertEqual(dataset, expected_result, "Download result should match.")
-
 if __name__ == '__main__':
     unittest.main()
