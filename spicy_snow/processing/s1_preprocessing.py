@@ -5,6 +5,7 @@ https://tc.copernicus.org/articles/16/159/2022/#section2
 """
 
 from typing import Dict
+import numpy as np
 import xarray as xr
 
 def s1_amp_to_dB(dataset: xr.Dataset) -> xr.Dataset:
