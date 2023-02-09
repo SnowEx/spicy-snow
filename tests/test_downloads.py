@@ -74,7 +74,7 @@ class TestSentinel1Search(unittest.TestCase):
 #     print(os.get_cwd())
     
 #     def test_fcf_return_type(self, fcf = fcf):
-#         self.assertEqual(type(fcf), xarray.DataArray) 
+#         self.assertEqual(type(fcf), xarray.DataArray)
     
 if __name__ == '__main__':
     unittest.main()
