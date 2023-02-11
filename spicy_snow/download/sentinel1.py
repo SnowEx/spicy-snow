@@ -107,7 +107,7 @@ def hyp3_pipeline(search_results: pd.DataFrame, job_name, existing_job_name = Fa
             scale = 'amplitude', dem_matching = False, resolution = 30)
 
     # warn user this may take a few hours for big jobs
-    print(f'Watching {len(rtc_jobs)}. This may take a while...')
+    print(f'Watching {len(rtc_jobs)} jobs. This may take a while...')
 
     # have hyp3 watch and update progress bar every 60 seconds
     hyp3.watch(rtc_jobs)
