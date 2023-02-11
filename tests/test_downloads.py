@@ -39,7 +39,7 @@ class TestSentinel1Search(unittest.TestCase):
         Test if sentinel-1 search returns correct images in dataframe
         """
         # Add in expected results
-        with open('./tests/test_data/search_result.pkl', 'rb') as f:
+        with open('./tests/test_data/search_result', 'rb') as f:
             expected_result = pickle.load(f)
         try:
             pd_testing.assert_frame_equal(search_result, expected_result)
@@ -74,7 +74,7 @@ class TestSentinel1Search(unittest.TestCase):
 #     print(os.get_cwd())
     
 #     def test_fcf_return_type(self, fcf = fcf):
-#         self.assertEqual(type(fcf), xarray.DataArray) 
+#         self.assertEqual(type(fcf), xarray.DataArray)
     
 if __name__ == '__main__':
     unittest.main()

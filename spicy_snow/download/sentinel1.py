@@ -107,7 +107,7 @@ def hyp3_pipeline(search_results: pd.DataFrame, job_name, existing_job_name = Fa
             scale = 'amplitude', dem_matching = False, resolution = 30)
 
     # warn user this may take a few hours for big jobs
-    print(f'Watching {len(rtc_jobs)}. This may take awhile...')
+    print(f'Watching {len(rtc_jobs)}. This may take a while...')
 
     # have hyp3 watch and update progress bar every 60 seconds
     hyp3.watch(rtc_jobs)
@@ -153,6 +153,13 @@ def hyp3_jobs_to_dataArray(jobs: sdk.jobs.Batch, area: shapely.geometry.box, out
             continue
         # otherwise append to granules list
         granules.append(granule)
+        # determine if scene is asc or des
+        meta_results = asf.search(granule_list = [granule],
+                                  flightDirection='Ascending')
+        if bool(meta_results) == True:
+            flight_dir = 'ascending'
+        else:
+            flight_dir = 'descending'
         # create dictionary to hold cloud url from .zip url
         # this lets us download only VV, VH, inc without getting other data from zip
         urls = {}
@@ -172,6 +179,18 @@ def hyp3_jobs_to_dataArray(jobs: sdk.jobs.Batch, area: shapely.geometry.box, out
             img = img.rio.clip([area], 'EPSG:4326')
             # add time as a indexable parameter
             img = img.assign_coords(time = pd.to_datetime(granule.split('_')[4]))
+            # add flight direction as indexable parameter
+            img = img.assign_coords(flight_dir = flight_dir)
+            # add platform as indexable parameter
+            platform = granule[0:3]
+            img = img.assign_coords(platform = platform)
+            # add relative orbit as indexable parameter
+            # https://gis.stackexchange.com/questions/237116/sentinel-1-relative-orbit
+            if platform == 'S1A':
+                relative_orbit = ((int(granule[49:55])-73)%175)+1
+            else:
+                relative_orbit = ((int(granule[49:55])-27)%175)+1
+            img = img.assign_coords(relative_orbit = relative_orbit)
             # create band name
             band_name = name.replace(f'{granule}_', '')
             # add band to image

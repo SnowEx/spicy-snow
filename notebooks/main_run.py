@@ -4,6 +4,7 @@ import shapely
 
 # Add main repo to path
 import sys
+import os
 from os.path import expanduser
 sys.path.append(expanduser('../'))
 
