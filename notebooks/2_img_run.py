@@ -31,7 +31,6 @@ if not skip:
 
     # download IMS snow cover and add to dataset ['ims'] keyword
     ds = download_snow_cover(ds, tmp_dir = '../data/tmp/', clean = False)
-    print(os.getcwd())
     # download fcf and add to dataset ['fcf'] keyword
     fcf = download_fcf('../data/fcf.tif')
     ds = add_fcf(ds, fcf)
