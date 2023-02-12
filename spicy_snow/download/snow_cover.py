@@ -31,7 +31,9 @@ def get_ims_day_data(year: str, doy: str, tmp_dir: str) -> xr.DataArray:
     year: Year of the data you want.
     doy: Calendar day of year you want in 'DDD' format. Range is 001 - 366.
     """
+
     # make temporary directory
+    cd = os.getcwd()
     os.makedirs(tmp_dir, exist_ok = True)
     os.chdir(tmp_dir)
     # download IMS data for this day and year
@@ -40,7 +42,7 @@ def get_ims_day_data(year: str, doy: str, tmp_dir: str) -> xr.DataArray:
     out_file = decompress(local_fp, local_fp.replace('.gz',''))
     # open as xarray dataArray
     ims = rxa.open_rasterio(out_file, decode_times = False)
-
+    os.chdir(cd)
     return ims
 
 def add_ims_data(dataset: xr.Dataset, ims: xr.DataArray, date: pd.Timestamp) -> xr.Dataset:

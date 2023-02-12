@@ -27,11 +27,11 @@ if not skip:
     print(f'Found {len(search_results)} results')
 
     # download s1 images into dataset ['s1'] keyword
-    ds = download_s1_imgs(search_results, area, tmp_dir = '../data/tmp', job_name = '2-img-test') #, existing_job_name = '2_img_test')
+    ds = download_s1_imgs(search_results, area, tmp_dir = '../data/tmp3', job_name = 'small-img-test', existing_job_name = 'small-img-test')
 
     # download IMS snow cover and add to dataset ['ims'] keyword
     ds = download_snow_cover(ds, tmp_dir = '../data/tmp/', clean = False)
-
+    print(os.getcwd())
     # download fcf and add to dataset ['fcf'] keyword
     fcf = download_fcf('../data/fcf.tif')
     ds = add_fcf(ds, fcf)
