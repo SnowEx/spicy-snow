@@ -32,10 +32,20 @@ def download_fcf(out_fp: str) -> xr.DataArray:
     return fcf
 
 def add_fcf(dataset: xr.Dataset, fcf: xr.DataArray) -> xr.Dataset:
+    """
+    Add xarray dataArray of forest cover data to a larger xarray Dataset.
+
+    Args:
+    dataset: large dataset to add IMS data to
+    fcf: fcf dataArray for all data
+
+    Returns:
+    dataset: large dataset with 'fcf' added as data variable
+    """
     # clip FCF to dataset boundaries (from user defined geometry)
     fcf = fcf.rio.clip_box(*dataset['s1'].rio.bounds())
     # reproject FCF to match dataset
-    fcf = fcf.rio.reproject_match(dataset)
+    fcf = fcf.rio.reproject_match(dataset['s1'])
     # remove band dimension as it only has one band
     fcf = fcf.squeeze('band')
     # merge FCF and name it 'fcf' as a data variable

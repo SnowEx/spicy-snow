@@ -83,15 +83,23 @@ def hyp3_pipeline(search_results: pd.DataFrame, job_name, existing_job_name = Fa
         hyp3 = sdk.HyP3(prompt = True)
 
     # if existing job name provided then don't submit and simply watch existing jobs.
-    if existing_job_name:
+    while existing_job_name:
         rtc_jobs = hyp3.find_jobs(name = existing_job_name)
+
+        # if no jobs found go to original search with name.
+        if len(rtc_jobs) == 0:
+            break
+
         # if no running jobs then just return succeeded jobs
         if len(rtc_jobs.filter_jobs(succeeded = False, failed = False)) == 0:
             return rtc_jobs.filter_jobs(succeeded = True)
+
         # otherwise watch running jobs
-        hyp3.watch(rtc_jobs.filter_jobs(succeeded = False, failed = False))
+        hyp3.watch(rtc_jobs)
+
         # refresh with new successes and failures
         rtc_jobs = hyp3.refresh(rtc_jobs)
+        
         # return successful jobs
         return rtc_jobs.filter_jobs(succeeded = True)
 
@@ -156,10 +164,12 @@ def hyp3_jobs_to_dataArray(jobs: sdk.jobs.Batch, area: shapely.geometry.box, out
         # determine if scene is asc or des
         meta_results = asf.search(granule_list = [granule],
                                   flightDirection='Ascending')
-        if bool(meta_results) == True:
+        if bool(meta_results):
             flight_dir = 'ascending'
-        else:
+        elif bool(asf.search(granule_list = [granule], flightDirection='Descending')):
             flight_dir = 'descending'
+        else:
+            raise ValueError("No flight direction found...")
         # create dictionary to hold cloud url from .zip url
         # this lets us download only VV, VH, inc without getting other data from zip
         urls = {}
@@ -177,29 +187,36 @@ def hyp3_jobs_to_dataArray(jobs: sdk.jobs.Batch, area: shapely.geometry.box, out
             img = img.rio.reproject('EPSG:4326')
             # clip to user specified area
             img = img.rio.clip([area], 'EPSG:4326')
-            # add time as a indexable parameter
-            img = img.assign_coords(time = pd.to_datetime(granule.split('_')[4]))
-            # add flight direction as indexable parameter
-            img = img.assign_coords(flight_dir = flight_dir)
-            # add platform as indexable parameter
-            platform = granule[0:3]
-            img = img.assign_coords(platform = platform)
-            # add relative orbit as indexable parameter
-            # https://gis.stackexchange.com/questions/237116/sentinel-1-relative-orbit
-            if platform == 'S1A':
-                relative_orbit = ((int(granule[49:55])-73)%175)+1
-            else:
-                relative_orbit = ((int(granule[49:55])-27)%175)+1
-            img = img.assign_coords(relative_orbit = relative_orbit)
             # create band name
             band_name = name.replace(f'{granule}_', '')
             # add band to image
-            imgs.append(img.assign_coords(band = [band_name]))
+            img = img.assign_coords(band = [band_name])
+            # add named band image to 3 image stack
+            imgs.append(img)
         # concat VV, VH, and inc into one xarray DataArray
         da = xr.concat(imgs, dim = 'band')
+
         # we need to reproject each image to match the first image to make CRSs work
         if das:
             da = da.rio.reproject_match(das[0])
+
+        da = da.expand_dims(dim = {'time': 1})
+        # add time as a indexable parameter
+        da = da.assign_coords(time = [pd.to_datetime(granule.split('_')[4])])
+        # add flight direction as indexable parameter
+        da = da.assign_coords(flight_dir = ('time', [flight_dir]))
+        # add platform as indexable parameter
+        platform = granule[0:3]
+        da = da.assign_coords(platform = ('time', [platform]))
+        # add relative orbit as indexable parameter
+        # https://gis.stackexchange.com/questions/237116/sentinel-1-relative-orbit
+        if platform == 'S1A':
+            relative_orbit = ((int(granule[49:55])-73)%175)+1
+        elif platform == 'S1B':
+            relative_orbit = ((int(granule[49:55])-27)%175)+1
+        else:
+            raise ValueError("No platform identified")
+        da = da.assign_coords(relative_orbit = ('time', [relative_orbit]))
         # append multi-band image to das list to concat into time-series DataArray
         das.append(da)
     # take list of multi-band images with different time values and make time series
