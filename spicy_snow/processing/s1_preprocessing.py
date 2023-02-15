@@ -18,9 +18,24 @@ def s1_amp_to_dB(dataset: xr.Dataset):
     Returns:
     None: modifies Dataset in place
     """
+    # mask all values 0 or negative
+    dataset['s1'].loc[dict(band = ['VV','VH'])] = dataset['s1'].loc[dict(band = ['VV','VH'])].where(dataset['s1'].loc[dict(band = ['VV','VH'])] > 0)
+    # convert all s1 images from amplitude to dB
+    dataset['s1'].loc[dict(band = ['VV','VH'])] = 10 * np.log10(dataset['s1'].sel(band = ['VV','VH']))
+
+def s1_dB_to_amp(dataset: xr.Dataset):
+    """
+    Convert s1 images from dB to amp
+
+    Args:
+    dataset: Xarray Dataset of sentinel images in dB
+
+    Returns:
+    None: modifies Dataset in place
+    """
 
     # convert all s1 images from amplitude to dB
-    dataset['s1'].loc[dict(band = ['VV','VH'])] = 10*np.log10(dataset['s1'].sel(band = ['VV','VH']))
+    dataset['s1'].loc[dict(band = ['VV','VH'])] = 10 ** (dataset['s1'].sel(band = ['VV','VH']) / 10)
 
 def subset_s1_images(dataset: xr.Dataset) -> Dict[str, xr.Dataset]:
     """
