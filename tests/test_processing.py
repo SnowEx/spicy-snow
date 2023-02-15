@@ -3,7 +3,6 @@ import unittest
 import numpy as np
 import xarray
 import pickle
-import pandas.testing as pd_testing
 
 import sys
 from os.path import expanduser
