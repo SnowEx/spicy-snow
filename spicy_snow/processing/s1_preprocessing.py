@@ -8,7 +8,7 @@ from typing import Dict
 import numpy as np
 import xarray as xr
 
-def s1_amp_to_dB(dataset: xr.Dataset) -> xr.Dataset:
+def s1_amp_to_dB(dataset: xr.Dataset):
     """
     Convert s1 images from amplitude to dB
 
@@ -16,15 +16,13 @@ def s1_amp_to_dB(dataset: xr.Dataset) -> xr.Dataset:
     dataset: Xarray Dataset of sentinel images in amplitude
 
     Returns:
-    dataset: Xarray Dataset of sentinel images in dB
+    None: modifies Dataset in place
     """
 
     # convert all s1 images from amplitude to dB
-    dataset['s1'].loc[dict(band = ['VV','VH'])] = 10*np.log10(dataset.sel(band = ['VV','VH'])['s1'])
+    dataset['s1'].loc[dict(band = ['VV','VH'])] = 10*np.log10(dataset['s1'].sel(band = ['VV','VH']))
 
-    return dataset
-
-def subset_s1_images(dataset: xr.Dataset) -> Dict[xr.Dataset]:
+def subset_s1_images(dataset: xr.Dataset) -> Dict[str, xr.Dataset]:
     """
     Subset s1 dataset into 4 subsets: ascending 1A, descending 1A, ascending 1B,
     and descending 1B
@@ -106,7 +104,7 @@ def s1_incidence_angle_masking(dataset: xr.Dataset) -> xr.Dataset:
 
     # mask pixels with incidence angle > 70 degrees
 
-def merge_s1_subsets(dataset: Dict[xr.Dataset]) -> xr.Dataset:
+def merge_s1_subsets(dataset: Dict[str, xr.Dataset]) -> xr.Dataset:
     """
     Remove s1 image outliers by masking pixels with incidence angles > 70 degrees
 
