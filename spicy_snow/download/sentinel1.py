@@ -161,15 +161,12 @@ def hyp3_jobs_to_dataArray(jobs: sdk.jobs.Batch, area: shapely.geometry.box, out
             continue
         # otherwise append to granules list
         granules.append(granule)
-        # determine if scene is asc or des
-        meta_results = asf.search(granule_list = [granule],
-                                  flightDirection='Ascending')
-        if bool(meta_results):
-            flight_dir = 'ascending'
-        elif bool(asf.search(granule_list = [granule], flightDirection='Descending')):
-            flight_dir = 'descending'
-        else:
-            raise ValueError("No flight direction found...")
+        # get granule metadata
+        granule_metadata = asf.product_search(f'{granule}-GRD_HD')[0]
+        # set flight direction
+        flight_dir = granule_metadata.properties['flightDirection'].lower()
+        # set relative orbit 
+        relative_orbit = granule_metadata.properties['pathNumber']
         # create dictionary to hold cloud url from .zip url
         # this lets us download only VV, VH, inc without getting other data from zip
         urls = {}
@@ -209,13 +206,6 @@ def hyp3_jobs_to_dataArray(jobs: sdk.jobs.Batch, area: shapely.geometry.box, out
         platform = granule[0:3]
         da = da.assign_coords(platform = ('time', [platform]))
         # add relative orbit as indexable parameter
-        # https://gis.stackexchange.com/questions/237116/sentinel-1-relative-orbit
-        if platform == 'S1A':
-            relative_orbit = ((int(granule[49:55])-73)%175)+1
-        elif platform == 'S1B':
-            relative_orbit = ((int(granule[49:55])-27)%175)+1
-        else:
-            raise ValueError("No platform identified")
         da = da.assign_coords(relative_orbit = ('time', [relative_orbit]))
         # append multi-band image to das list to concat into time-series DataArray
         das.append(da)
