@@ -7,14 +7,14 @@ import pandas.testing as pd_testing
 
 import sys
 from os.path import expanduser
-sys.path.append(expanduser('../'))
+sys.path.append(expanduser('./'))
 from spicy_snow.processing.s1_preprocessing import s1_amp_to_dB
 
 class TestSentinel1PreProcessing(unittest.TestCase):
     """
     Test functionality of preprocessing functions for Sentinel-1
     """
-    with open('../tests/test_data/2_img_ds', 'rb') as f:
+    with open('./tests/test_data/2_img_ds', 'rb') as f:
         ds = pickle.load(f)
     
     def test_amp_2_dB(self, ds = ds):
