@@ -22,15 +22,15 @@ Lievens et al 2021 - https://tc.copernicus.org/articles/16/159/2022/
     - [ ] geographic area
     - [ ] others?
 
-- [ x ] Data products to pull in:
-    - [ x ] Sentinel 1 - orbit file, border noise, thermal noise, radiometric calibration, terrain flattened, gamma_0, range dopper terrain correction, averaged to 100m, mask out incidence angles >70
-    - [ x ] Snow cover (0/1) - Interactive multisensor snow and ice mapping system
+- [x] Data products to pull in:
+    - [x] Sentinel 1 - orbit file, border noise, thermal noise, radiometric calibration, terrain flattened, gamma_0, range dopper terrain correction, averaged to 100m, mask out incidence angles >70
+    - [x] Snow cover (0/1) - Interactive multisensor snow and ice mapping system
     - [ ] Glacier cover from Randolph Glacier Inventory 6.0
-    - [ x ] Forest Cover Fraction from copernicus PROBA-V dataset
+    - [x] Forest Cover Fraction from copernicus PROBA-V dataset
 
 - [ ] Processing steps
     - [ ] Rescale by mean for all orbits to overall mean
-    - [ x ] Remove observations 3dB above 90th percentile or 3dB below 10th percentile
+    - [x] Remove observations 3dB above 90th percentile or 3dB below 10th percentile
     - [ ] Calculate \triangle \gamma_{CR} and \triangle \gamma_{VV}
     - [ ] Calculate combined values \gamma
     - [ ] Calculate SI and SD, uses snow cover form IMS too
