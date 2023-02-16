@@ -237,6 +237,8 @@ def download_s1_imgs(search_results: pd.DataFrame, area: shapely.geometry.box, j
     s1_dataArray = hyp3_jobs_to_dataArray(jobs = rtc_jobs, area = area, outdir = tmp_dir, clean = False)
     # promote to DataSet and set sentinel 1 image to 's1' data variable
     s1_dataset = s1_dataArray.to_dataset(name = 's1', promote_attrs = True)
+    # s1_units tag
+    s1_dataset.attrs['s1_units'] = 'amp'
     # save to netcdf for testing
     # s1_dataset.to_netcdf(out_fp)
     return s1_dataset
