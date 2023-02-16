@@ -11,34 +11,46 @@ import xarray as xr
 import rioxarray
 from rioxarray.merge import merge_arrays
 
-def s1_amp_to_dB(dataset: xr.Dataset):
+def s1_amp_to_dB(dataset: xr.Dataset, inplace: bool = False):
     """
     Convert s1 images from amplitude to dB
 
     Args:
     dataset: Xarray Dataset of sentinel images in amplitude
+    inplace: boolean flag to modify original Dataset or return a new Dataset
 
     Returns:
-    None: modifies Dataset in place
+    dataset: Xarray dataset of sentinel image in dB
     """
+    if not inplace:
+        dataset = dataset.copy(deep=True)
     # mask all values 0 or negative
     dataset['s1'] = dataset['s1'].where(dataset['s1'] > 0)
     # convert all s1 images from amplitude to dB
     dataset['s1'].loc[dict(band = ['VV','VH'])] = 10 * np.log10(dataset['s1'].sel(band = ['VV','VH']))
 
-def s1_dB_to_amp(dataset: xr.Dataset):
+    if not inplace:
+        return dataset
+
+def s1_dB_to_amp(dataset: xr.Dataset, inplace: bool = False):
     """
     Convert s1 images from dB to amp
 
     Args:
     dataset: Xarray Dataset of sentinel images in dB
+    inplace: boolean flag to modify original Dataset or return a new Dataset
 
     Returns:
-    None: modifies Dataset in place
+    dataset: Xarray Dataset of sentinel images in amplitude
     """
-
+    if not inplace:
+        dataset = dataset.copy(deep=True)
+        
     # convert all s1 images from amplitude to dB
     dataset['s1'].loc[dict(band = ['VV','VH'])] = 10 ** (dataset['s1'].sel(band = ['VV','VH']) / 10)
+
+    if not inplace:
+        return dataset
 
 def merge_s1_times(dataset: xr.Dataset, times: List[np.datetime64], verbose: bool = False) -> xr.Dataset:
     """
@@ -51,8 +63,8 @@ def merge_s1_times(dataset: xr.Dataset, times: List[np.datetime64], verbose: boo
 
     Return:
     Xarray dataset: Xarray Dataset with sentinel-1 images with times combined into one
-
     """
+
     if verbose:
         print('Merging:', times)
     das = [dataset.sel(time = ts)['s1'] for ts in times]
@@ -65,6 +77,7 @@ def merge_s1_times(dataset: xr.Dataset, times: List[np.datetime64], verbose: boo
     dataset = dataset.drop_sel(time = times[1:])
     dataset['s1'].loc[dict(time = times[0])] = merged.values
     times = []
+
     return dataset
 
 def merge_partial_s1_images(dataset: xr.Dataset) -> xr.Dataset:

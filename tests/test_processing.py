@@ -26,9 +26,9 @@ class TestSentinel1PreProcessing(unittest.TestCase):
         amp = ds['s1'].isel(time = 0).sel(band = 'VV').values.ravel()
         amp = amp[amp != 0]
 
-        s1_amp_to_dB(ds)
+        ds_dB = s1_amp_to_dB(ds)
 
-        dB = ds['s1'].isel(time = 0).sel(band = 'VV').values.ravel()
+        dB = ds_dB['s1'].isel(time = 0).sel(band = 'VV').values.ravel()
         dB = dB[~np.isnan(dB)]
 
         assert np.allclose(dB, 10 * np.log10(amp))
@@ -42,9 +42,9 @@ class TestSentinel1PreProcessing(unittest.TestCase):
 
         ds['s1'].isel(time = 0).sel(band = 'VV')[100, 100] = 0
 
-        s1_amp_to_dB(ds)
+        ds_dB = s1_amp_to_dB(ds)
 
-        assert(np.isnan(ds['s1'].isel(time = 0).sel(band = 'VV')[100, 100]))
+        assert(np.isnan(ds_dB['s1'].isel(time = 0).sel(band = 'VV')[100, 100]))
     
     def test_dB_2_amp(self):
         """
@@ -54,13 +54,15 @@ class TestSentinel1PreProcessing(unittest.TestCase):
         with open('./tests/test_data/2_img_ds', 'rb') as f:
             ds = pickle.load(f)
 
-        dB = ds['s1'].isel(time = 0).sel(band = 'VV').values.ravel()
+        amp_original = ds['s1'].isel(time = 0).sel(band = 'VV').values.ravel()
 
-        s1_dB_to_amp(ds)
+        ds_dB = s1_amp_to_dB(ds)
+        dB = ds_dB['s1'].isel(time = 0).sel(band = 'VV').values.ravel()
 
-        amp = ds['s1'].isel(time = 0).sel(band = 'VV').values.ravel()
+        ds_amp = s1_dB_to_amp(ds_dB)
+        amp = ds_amp['s1'].isel(time = 0).sel(band = 'VV').values.ravel()
 
-        assert(np.allclose(amp, dB))
+        assert(np.allclose(amp, amp_original))
 
     def test_same_orbit_merge_zeros(self):
         """
