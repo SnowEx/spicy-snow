@@ -141,7 +141,7 @@ def s1_orbit_averaging(dataset: xr.Dataset) -> xr.Dataset:
 
     pass
 
-def s1_clip_outliers(dataset: xr.Dataset) -> xr.Dataset:
+def s1_clip_outliers(dataset: xr.Dataset, inplace: bool=False) -> xr.Dataset:
     """
     Remove s1 image outliers by masking pixels 3 dB above 90th percentile or
     3 dB before the 10th percentile. (-35 -> 15 dB for VV) and (-40 -> 10 for VH
@@ -149,14 +149,33 @@ def s1_clip_outliers(dataset: xr.Dataset) -> xr.Dataset:
 
     Args:
     dataset: Xarray Dataset of sentinel images to clip outliers
+    inplace: boolean flag to modify original Dataset or return a new Dataset
 
     Returns:
     dataset: Xarray Dataset of sentinel images with masked outliers
     """
+    # Check inplace flag
+    if inplace:
+        ds = dataset
+        rtrn = False
+    else:
+        ds = dataset.copy(deep=True)
+        rtrn = True
 
     # Calculate time series 10th and 90th percentile 
-    # branch test
-    # mask pixels 3dB below or 3dB above percentiles
+    # Threshold vals 3 dB above/below percentiles
+    for band in ['VV','VH']:
+        data = ds['s1'].sel(band=band)
+        vals = ds['s1'].sel(band=band).values.flatten()
+        vals_valid = vals[~np.isnan(vals)]
+        thresh_lo = np.percentile(vals_valid, 10) - 3
+        thresh_hi = np.percentile(vals_valid, 90) + 3
+        # Mask using percentile thresholds
+        data_masked = data.where((data > thresh_lo) & (data < thresh_hi))
+        ds['s1'].loc[dict(band = band)] = data_masked
+
+    if rtrn:
+        return ds
 
 def ims_water_mask(dataset: xr.Dataset) -> xr.Dataset:
     """
