@@ -24,11 +24,21 @@ def s1_amp_to_dB(dataset: xr.Dataset, inplace: bool = False):
     """
     if not inplace:
         dataset = dataset.copy(deep=True)
+
+    # check for dB
+    if 's1_units' in dataset.attrs.keys():
+        if dataset.attrs['s1_units'] == 'dB' and not inplace:
+            print("Sentinel 1 units already in dB.")
+            return dataset
+        if dataset.attrs['s1_units'] == 'dB':
+            return
+    
     # mask all values 0 or negative
     dataset['s1'] = dataset['s1'].where(dataset['s1'] > 0)
     # convert all s1 images from amplitude to dB
     dataset['s1'].loc[dict(band = ['VV','VH'])] = 10 * np.log10(dataset['s1'].sel(band = ['VV','VH']))
 
+    dataset.attrs['s1_units'] = 'dB'
     if not inplace:
         return dataset
 
@@ -45,10 +55,18 @@ def s1_dB_to_amp(dataset: xr.Dataset, inplace: bool = False):
     """
     if not inplace:
         dataset = dataset.copy(deep=True)
+    
+    # check for amp
+    if 's1_units' in dataset.attrs.keys():
+        if dataset.attrs['s1_units'] == 'amp' and not inplace:
+            print("Sentinel 1 units already in dB.")
+            return dataset
+        if dataset.attrs['s1_units'] == 'amp':
+            return
         
     # convert all s1 images from amplitude to dB
     dataset['s1'].loc[dict(band = ['VV','VH'])] = 10 ** (dataset['s1'].sel(band = ['VV','VH']) / 10)
-
+    dataset.attrs['s1_units'] = 'amp'
     if not inplace:
         return dataset
 
