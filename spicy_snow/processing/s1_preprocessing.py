@@ -50,6 +50,13 @@ def subset_s1_images(dataset: xr.Dataset) -> Dict[str, xr.Dataset]:
     ascending, descending, and 1A and 1B with keys {satellite}-{direction}.
     """
 
+    # might want to use this .set_xindex to speed up searching but would need to
+    # delete after function runs.
+    # ds = ds.set_xindex('relative_orbit')
+    # ds.sel(relative_orbit = 20)
+    # otherwise:
+    # ds.where(ds.flight_dir == 'ascending', drop = True)
+
     # Calculate unique orbits, ascending, satellites
 
     # Add orbit, ascending vs. descending, satellite #
