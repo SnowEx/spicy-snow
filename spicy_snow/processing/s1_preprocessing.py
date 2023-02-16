@@ -103,8 +103,6 @@ def merge_partial_s1_images(dataset: xr.Dataset) -> xr.Dataset:
         
     return dataset
 
-
-
 def subset_s1_images(dataset: xr.Dataset) -> Dict[str, xr.Dataset]:
     """
     Subset s1 dataset into 4 subsets: ascending 1A, descending 1A, ascending 1B,
