@@ -160,24 +160,45 @@ def subset_s1_images(dataset: xr.Dataset) -> Dict[str, xr.Dataset]:
 
     # split Dataset by satellite and 
 
-def s1_orbit_averaging(dataset: xr.Dataset) -> xr.Dataset:
+def s1_orbit_averaging(dataset: xr.Dataset, inplace: bool = False) -> xr.Dataset:
     """
     Normalize s1 images by rescaling each image so its orbit's mean matches the
     overall time series mean. To allow for different orbits to be compared
 
     Args:
     dataset: Xarray Dataset of sentinel images to normalize by orbit 
+    inplace: boolean flag to modify original Dataset or return a new Dataset
 
     Returns:
     dataset: Xarray Dataset of sentinel images with all s1 images normalized to total mean
     """
-    # Calculate the overall (all orbits) mean
+    # check inplace flag
+    if not inplace:
+        dataset = dataset.copy(deep=True)
+    
+    # check for dB
+    if 's1_units' in dataset.attrs.keys():
+        assert dataset.attrs['s1_units'] == 'dB', "Sentinel 1 units must be dB not amplitude."
 
-    # Calculate each orbit's mean value
+    # get all unique relative orbits
+    orbits = np.unique(dataset['relative_orbit'].values)
 
-    # rescale each image by the mean correction (orbit mean -> overall mean)
+    # loop through bands
+    for band in ['VV', 'VH']:
+        
+        # calculate the overall (all orbits) mean
+        overall_mean  = dataset['s1'].mean(dim = ['x','y','time']).sel(band = band)
+        for orbit in orbits:
+            
+            # calculate each orbit's mean value
+            orbit_mean = dataset['s1'].sel(time = dataset.relative_orbit == orbit, band = band).mean(dim = ['x','y','time'])
 
-    pass
+            # rescale each image by the mean correction (orbit mean -> overall mean)
+            dataset['s1'].loc[dict(time = dataset.relative_orbit == orbit, band = band)] = \
+                dataset['s1'].loc[dict(time = dataset.relative_orbit == orbit, band = band)] - (orbit_mean - overall_mean)
+
+    if not inplace:
+        return dataset
 
 def s1_clip_outliers(dataset: xr.Dataset, inplace: bool = False, verbose: bool = False) -> xr.Dataset:
     """
@@ -199,7 +220,7 @@ def s1_clip_outliers(dataset: xr.Dataset, inplace: bool = False, verbose: bool =
 
     # check for dB
     if 's1_units' in dataset.attrs.keys():
-        assert dataset.attrs['s1_unit'] == 'dB', "Sentinel 1 units must be dB not amplitude."
+        assert dataset.attrs['s1_units'] == 'dB', "Sentinel 1 units must be dB not amplitude."
 
     # Calculate time series 10th and 90th percentile 
     # Threshold vals 3 dB above/below percentiles
