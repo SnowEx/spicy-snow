@@ -160,8 +160,8 @@ def s1_clip_outliers(dataset: xr.Dataset, inplace: bool = False, verbose: bool =
         dataset = dataset.copy(deep=True)
 
     # check for dB
-    if 's1_units' in ds.attrs.keys():
-        assert ds.attrs['s1_unit'] == 'dB', "Sentinel 1 units must be dB not amplitude."
+    if 's1_units' in dataset.attrs.keys():
+        assert dataset.attrs['s1_unit'] == 'dB', "Sentinel 1 units must be dB not amplitude."
 
     # Calculate time series 10th and 90th percentile 
     # Threshold vals 3 dB above/below percentiles
