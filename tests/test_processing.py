@@ -9,7 +9,7 @@ import sys
 from os.path import expanduser
 sys.path.append(expanduser('./'))
 from spicy_snow.processing.s1_preprocessing import s1_amp_to_dB, s1_dB_to_amp, \
-    merge_partial_s1_images, s1_clip_outliers
+    merge_partial_s1_images, s1_clip_outliers, s1_orbit_averaging
 
 class TestSentinel1PreProcessing(unittest.TestCase):
     """
@@ -154,6 +154,30 @@ class TestSentinel1PreProcessing(unittest.TestCase):
         assert ds['s1'].sel(band = 'VH').max() > ds1['s1'].sel(band = 'VV').max()
         assert ds['s1'].sel(band = 'VH').min() < ds1['s1'].sel(band = 'VV').min()
         
-    
+    def test_orbit_averaging(self):
+        with open('./tests/test_data/2_img_ds', 'rb') as f:
+            ds = pickle.load(f)
+
+        ds = ds.assign_coords(relative_orbit = ('time', [0, 1, 2]))
+
+        overall_means = ds['s1'].mean(dim = ['x', 'y', 'time']).sel(band = ['VV', 'VH'])
+
+        aveds = s1_orbit_averaging(ds)
+
+        ave_means = aveds.mean(dim = ['x', 'y']).sel(band = ['VV', 'VH'])
+
+        for i in range(3):
+            assert np.allclose(ave_means['s1'].sel(time = ave_means.relative_orbit == i), overall_means)
+
+    def test_orbit_averaging_errors(self):
+        with open('./tests/test_data/2_img_ds', 'rb') as f:
+            ds = pickle.load(f)
+        
+        ds.attrs['s1_units'] = 'amp'
+
+        self.assertRaises(AssertionError, s1_orbit_averaging, ds)
+
+        
+        
 if __name__ == '__main__':
     unittest.main()
