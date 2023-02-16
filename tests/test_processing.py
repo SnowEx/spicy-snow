@@ -9,7 +9,7 @@ import sys
 from os.path import expanduser
 sys.path.append(expanduser('./'))
 from spicy_snow.processing.s1_preprocessing import s1_amp_to_dB, s1_dB_to_amp, \
-    merge_partial_s1_images
+    merge_partial_s1_images, s1_clip_outliers
 
 class TestSentinel1PreProcessing(unittest.TestCase):
     """
@@ -26,9 +26,9 @@ class TestSentinel1PreProcessing(unittest.TestCase):
         amp = ds['s1'].isel(time = 0).sel(band = 'VV').values.ravel()
         amp = amp[amp != 0]
 
-        s1_amp_to_dB(ds)
+        ds_dB = s1_amp_to_dB(ds)
 
-        dB = ds['s1'].isel(time = 0).sel(band = 'VV').values.ravel()
+        dB = ds_dB['s1'].isel(time = 0).sel(band = 'VV').values.ravel()
         dB = dB[~np.isnan(dB)]
 
         assert np.allclose(dB, 10 * np.log10(amp))
@@ -42,9 +42,9 @@ class TestSentinel1PreProcessing(unittest.TestCase):
 
         ds['s1'].isel(time = 0).sel(band = 'VV')[100, 100] = 0
 
-        s1_amp_to_dB(ds)
+        ds_dB = s1_amp_to_dB(ds)
 
-        assert(np.isnan(ds['s1'].isel(time = 0).sel(band = 'VV')[100, 100]))
+        assert(np.isnan(ds_dB['s1'].isel(time = 0).sel(band = 'VV')[100, 100]))
     
     def test_dB_2_amp(self):
         """
@@ -54,13 +54,15 @@ class TestSentinel1PreProcessing(unittest.TestCase):
         with open('./tests/test_data/2_img_ds', 'rb') as f:
             ds = pickle.load(f)
 
-        dB = ds['s1'].isel(time = 0).sel(band = 'VV').values.ravel()
+        amp_original = ds['s1'].isel(time = 0).sel(band = 'VV').values.ravel()
 
-        s1_dB_to_amp(ds)
+        ds_dB = s1_amp_to_dB(ds)
+        dB = ds_dB['s1'].isel(time = 0).sel(band = 'VV').values.ravel()
 
-        amp = ds['s1'].isel(time = 0).sel(band = 'VV').values.ravel()
+        ds_amp = s1_dB_to_amp(ds_dB)
+        amp = ds_amp['s1'].isel(time = 0).sel(band = 'VV').values.ravel()
 
-        assert(np.allclose(amp, dB))
+        assert(np.allclose(amp, amp_original))
 
     def test_same_orbit_merge_zeros(self):
         """
@@ -131,6 +133,27 @@ class TestSentinel1PreProcessing(unittest.TestCase):
         assert(ds1.isel(time = 0).time == ds.isel(time = 0).time)
         # assert new merged image is same as pre-sliced image
         assert(np.allclose(ds1.isel(time = 0)['s1'], img_old))
+    
+    def test_outlier_clip(self):
+        """
+        Tests whether outliers 10th percentile - 3dB and 90th percentile + 3db
+        are masked
+        """
+        with open('./tests/test_data/2_img_ds', 'rb') as f:
+            ds = pickle.load(f)
+
+        t1 = ds.isel(time = 0)['time']
+        for band in ['VV', 'VH']:
+            ds.loc[dict(time = t1, band = band)]['s1'][0, 0] = -50
+            ds.loc[dict(time = t1, band = band)]['s1'][0, 1] = 50
+
+        ds1 = s1_clip_outliers(ds)
+
+        assert ds['s1'].sel(band = 'VV').max() > ds1['s1'].sel(band = 'VV').max()
+        assert ds['s1'].sel(band = 'VV').min() < ds1['s1'].sel(band = 'VV').min()
+        assert ds['s1'].sel(band = 'VH').max() > ds1['s1'].sel(band = 'VV').max()
+        assert ds['s1'].sel(band = 'VH').min() < ds1['s1'].sel(band = 'VV').min()
+        
     
 if __name__ == '__main__':
     unittest.main()

@@ -11,34 +11,46 @@ import xarray as xr
 import rioxarray
 from rioxarray.merge import merge_arrays
 
-def s1_amp_to_dB(dataset: xr.Dataset):
+def s1_amp_to_dB(dataset: xr.Dataset, inplace: bool = False):
     """
     Convert s1 images from amplitude to dB
 
     Args:
     dataset: Xarray Dataset of sentinel images in amplitude
+    inplace: boolean flag to modify original Dataset or return a new Dataset
 
     Returns:
-    None: modifies Dataset in place
+    dataset: Xarray dataset of sentinel image in dB
     """
+    if not inplace:
+        dataset = dataset.copy(deep=True)
     # mask all values 0 or negative
     dataset['s1'] = dataset['s1'].where(dataset['s1'] > 0)
     # convert all s1 images from amplitude to dB
     dataset['s1'].loc[dict(band = ['VV','VH'])] = 10 * np.log10(dataset['s1'].sel(band = ['VV','VH']))
 
-def s1_dB_to_amp(dataset: xr.Dataset):
+    if not inplace:
+        return dataset
+
+def s1_dB_to_amp(dataset: xr.Dataset, inplace: bool = False):
     """
     Convert s1 images from dB to amp
 
     Args:
     dataset: Xarray Dataset of sentinel images in dB
+    inplace: boolean flag to modify original Dataset or return a new Dataset
 
     Returns:
-    None: modifies Dataset in place
+    dataset: Xarray Dataset of sentinel images in amplitude
     """
-
+    if not inplace:
+        dataset = dataset.copy(deep=True)
+        
     # convert all s1 images from amplitude to dB
     dataset['s1'].loc[dict(band = ['VV','VH'])] = 10 ** (dataset['s1'].sel(band = ['VV','VH']) / 10)
+
+    if not inplace:
+        return dataset
 
 def merge_s1_times(dataset: xr.Dataset, times: List[np.datetime64], verbose: bool = False) -> xr.Dataset:
     """
@@ -51,8 +63,8 @@ def merge_s1_times(dataset: xr.Dataset, times: List[np.datetime64], verbose: boo
 
     Return:
     Xarray dataset: Xarray Dataset with sentinel-1 images with times combined into one
-
     """
+
     if verbose:
         print('Merging:', times)
     das = [dataset.sel(time = ts)['s1'] for ts in times]
@@ -65,6 +77,7 @@ def merge_s1_times(dataset: xr.Dataset, times: List[np.datetime64], verbose: boo
     dataset = dataset.drop_sel(time = times[1:])
     dataset['s1'].loc[dict(time = times[0])] = merged.values
     times = []
+
     return dataset
 
 def merge_partial_s1_images(dataset: xr.Dataset) -> xr.Dataset:
@@ -148,7 +161,7 @@ def s1_orbit_averaging(dataset: xr.Dataset) -> xr.Dataset:
 
     pass
 
-def s1_clip_outliers(dataset: xr.Dataset) -> xr.Dataset:
+def s1_clip_outliers(dataset: xr.Dataset, inplace: bool = False, verbose: bool = False) -> xr.Dataset:
     """
     Remove s1 image outliers by masking pixels 3 dB above 90th percentile or
     3 dB before the 10th percentile. (-35 -> 15 dB for VV) and (-40 -> 10 for VH
@@ -156,14 +169,43 @@ def s1_clip_outliers(dataset: xr.Dataset) -> xr.Dataset:
 
     Args:
     dataset: Xarray Dataset of sentinel images to clip outliers
+    inplace: boolean flag to modify original Dataset or return a new Dataset
+    verbose: flag to print out masking stats
 
     Returns:
     dataset: Xarray Dataset of sentinel images with masked outliers
     """
+    # Check inplace flag
+    if not inplace:
+        dataset = dataset.copy(deep=True)
+
+    # check for dB
+    if 's1_units' in dataset.attrs.keys():
+        assert dataset.attrs['s1_unit'] == 'dB', "Sentinel 1 units must be dB not amplitude."
 
     # Calculate time series 10th and 90th percentile 
+    # Threshold vals 3 dB above/below percentiles
+    for band in ['VV','VH']:
+        data = dataset['s1'].sel(band=band)
+        thresh_lo, thresh_hi = data.quantile([0.1, 0.9], skipna = True)
+        thresh_lo -= 3
+        thresh_hi += 3
+        # Mask using percentile thresholds
+        data_masked = data.where((data > thresh_lo) & (data < thresh_hi))
 
-    # mask pixels 3dB below or 3dB above percentiles
+        if verbose:
+            print(f'Clipping band: {band}')
+            print(f'Thresh min: {thresh_lo.values}. Thresh max: {thresh_hi.values}')
+            pre_min, pre_max = data.min().values, data.max().values
+            print(f'Data min: {pre_min}. Data max: {pre_max}')
+            min, max = data_masked.min().values, data_masked.max().values
+            print(f'Masked data min: {min}. Data max: {max}')
+
+        dataset['s1'].loc[dict(band = band)] = data_masked
+
+
+    if not inplace:
+        return dataset
 
 def ims_water_mask(dataset: xr.Dataset) -> xr.Dataset:
     """
