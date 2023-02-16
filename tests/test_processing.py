@@ -9,7 +9,7 @@ import sys
 from os.path import expanduser
 sys.path.append(expanduser('./'))
 from spicy_snow.processing.s1_preprocessing import s1_amp_to_dB, s1_dB_to_amp, \
-    merge_partial_s1_images
+    merge_partial_s1_images, s1_clip_outliers
 
 class TestSentinel1PreProcessing(unittest.TestCase):
     """
@@ -131,6 +131,27 @@ class TestSentinel1PreProcessing(unittest.TestCase):
         assert(ds1.isel(time = 0).time == ds.isel(time = 0).time)
         # assert new merged image is same as pre-sliced image
         assert(np.allclose(ds1.isel(time = 0)['s1'], img_old))
+    
+    def test_outlier_clip(self):
+        """
+        Tests whether outliers 10th percentile - 3dB and 90th percentile + 3db
+        are masked
+        """
+        with open('./tests/test_data/2_img_ds', 'rb') as f:
+            ds = pickle.load(f)
+
+        t1 = ds.isel(time = 0)['time']
+        for band in ['VV', 'VH']:
+            ds.loc[dict(time = t1, band = band)]['s1'][0, 0] = -50
+            ds.loc[dict(time = t1, band = band)]['s1'][0, 1] = 50
+
+        ds1 = s1_clip_outliers(ds)
+
+        assert ds['s1'].sel(band = 'VV').max() > ds1['s1'].sel(band = 'VV').max()
+        assert ds['s1'].sel(band = 'VV').min() < ds1['s1'].sel(band = 'VV').min()
+        assert ds['s1'].sel(band = 'VH').max() > ds1['s1'].sel(band = 'VV').max()
+        assert ds['s1'].sel(band = 'VH').min() < ds1['s1'].sel(band = 'VV').min()
+        
     
 if __name__ == '__main__':
     unittest.main()

@@ -141,7 +141,7 @@ def s1_orbit_averaging(dataset: xr.Dataset) -> xr.Dataset:
 
     pass
 
-def s1_clip_outliers(dataset: xr.Dataset, inplace: bool=False) -> xr.Dataset:
+def s1_clip_outliers(dataset: xr.Dataset, inplace: bool = False, verbose: bool = False) -> xr.Dataset:
     """
     Remove s1 image outliers by masking pixels 3 dB above 90th percentile or
     3 dB before the 10th percentile. (-35 -> 15 dB for VV) and (-40 -> 10 for VH
@@ -150,32 +150,42 @@ def s1_clip_outliers(dataset: xr.Dataset, inplace: bool=False) -> xr.Dataset:
     Args:
     dataset: Xarray Dataset of sentinel images to clip outliers
     inplace: boolean flag to modify original Dataset or return a new Dataset
+    verbose: flag to print out masking stats
 
     Returns:
     dataset: Xarray Dataset of sentinel images with masked outliers
     """
     # Check inplace flag
-    if inplace:
-        ds = dataset
-        rtrn = False
-    else:
-        ds = dataset.copy(deep=True)
-        rtrn = True
+    if not inplace:
+        dataset = dataset.copy(deep=True)
+
+    # check for dB
+    if 's1_units' in ds.attrs.keys():
+        assert ds.attrs['s1_unit'] == 'dB', "Sentinel 1 units must be dB not amplitude."
 
     # Calculate time series 10th and 90th percentile 
     # Threshold vals 3 dB above/below percentiles
     for band in ['VV','VH']:
-        data = ds['s1'].sel(band=band)
-        vals = ds['s1'].sel(band=band).values.flatten()
-        vals_valid = vals[~np.isnan(vals)]
-        thresh_lo = np.percentile(vals_valid, 10) - 3
-        thresh_hi = np.percentile(vals_valid, 90) + 3
+        data = dataset['s1'].sel(band=band)
+        thresh_lo, thresh_hi = data.quantile([0.1, 0.9], skipna = True)
+        thresh_lo -= 3
+        thresh_hi += 3
         # Mask using percentile thresholds
         data_masked = data.where((data > thresh_lo) & (data < thresh_hi))
-        ds['s1'].loc[dict(band = band)] = data_masked
 
-    if rtrn:
-        return ds
+        if verbose:
+            print(f'Clipping band: {band}')
+            print(f'Thresh min: {thresh_lo.values}. Thresh max: {thresh_hi.values}')
+            pre_min, pre_max = data.min().values, data.max().values
+            print(f'Data min: {pre_min}. Data max: {pre_max}')
+            min, max = data_masked.min().values, data_masked.max().values
+            print(f'Masked data min: {min}. Data max: {max}')
+
+        dataset['s1'].loc[dict(band = band)] = data_masked
+
+
+    if not inplace:
+        return dataset
 
 def ims_water_mask(dataset: xr.Dataset) -> xr.Dataset:
     """
