@@ -29,7 +29,7 @@ Lievens et al 2021 - https://tc.copernicus.org/articles/16/159/2022/
     - [x] Forest Cover Fraction from copernicus PROBA-V dataset
 
 - [ ] Processing steps
-    - [ ] Rescale by mean for all orbits to overall mean
+    - [x] Rescale by mean for all orbits to overall mean
     - [x] Remove observations 3dB above 90th percentile or 3dB below 10th percentile
     - [ ] Calculate \triangle \gamma_{CR} and \triangle \gamma_{VV}
     - [ ] Calculate combined values \gamma
