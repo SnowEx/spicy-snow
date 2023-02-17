@@ -50,7 +50,7 @@ def calc_delta_VV(dataset: xr.Dataset, inplace: bool = False) -> xr.Dataset:
     if not inplace:
         return dataset
 
-def calc_delta_cross_ratio(dataset: xr.Dataset, A: float = 2) -> xr.Dataset:
+def calc_delta_cross_ratio(dataset: xr.Dataset, A: float = 2, inplace: bool = False) -> xr.Dataset:
     """
     Calculate change in cross-polarization ratio for all time steps.
     
@@ -68,18 +68,44 @@ def calc_delta_cross_ratio(dataset: xr.Dataset, A: float = 2) -> xr.Dataset:
     Args:
     dataset: Xarray Dataset of sentinel images
     A: fitting parameter [default = 2]
+    inplace: operate on dataset in place or return copy
 
     Returns:
-    dataset: Xarray Dataset of sentinel images with deltaCR added as data
+    dataset: Xarray Dataset of sentinel images with deltaCR added as data var
     """
 
+    # check inplace flag
+    if not inplace:
+        dataset = dataset.copy(deep=True)
+
+    # check for amp
+    if 's1_units' in dataset.attrs.keys():
+        assert dataset.attrs['s1_units'] == 'dB', 'Sentinel-1 units must be in dB'
+
     # calculate cross ratio of VH to VV with fitting parameter A
+    gamma_cr = (A * dataset['s1'].sel(band='VH')) - dataset['s1'].sel(band='VV')
 
+    # get all unique relative orbits
+    orbits = np.unique(dataset['relative_orbit'].values)
+    
     # Identify previous image from the same relative orbit (6, 12, 18, or 24 days ago)
+    for orbit in orbits:
 
-    # Calculate change in gamma-cr between previous and current time step
-
-    # add delta-gamma-cr as band to dataset
+        # Calculate change in gamma-cr between previous and current time step
+        diffCR = gamma_cr.sel(time = dataset.relative_orbit == orbit).diff(dim = 'time')
+        
+        # add delta-gamma-cr as band to dataset
+        # if adding new 
+        if 'deltaCR' not in dataset.data_vars:
+            # add delta-gamma-CR as new variable to dataset
+            dataset['deltaCR'] = diffCR
+        
+        else:
+            # update deltaCR times with this. 
+            dataset['deltaCR'].loc[dict(time = diffCR.time)] = diffCR
+    
+    if not inplace:
+        return dataset
 
 def calc_delta_gamma(dataset: xr.Dataset, B: float = 0.5) -> xr.Dataset:
     """
