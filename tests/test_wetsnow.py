@@ -16,7 +16,7 @@ class TestWetSnowMask(unittest.TestCase):
     Test functionality of identify and setting wet snow paper from Lievens et al 2021
     """
 
-    with open('/Users/zachkeskinen/Documents/spicy-snow/tests/test_data/pre_processed_ds', 'rb') as f:
+    with open('/Users/zachkeskinen/Documents/spicy-snow/tests/test_data/2_img_ds', 'rb') as f:
         ds = pickle.load(f)
 
     def test_id_newly_wet(self, ds = ds):
