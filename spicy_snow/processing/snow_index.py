@@ -101,7 +101,7 @@ def calc_delta_cross_ratio(dataset: xr.Dataset, A: float = 2) -> xr.Dataset:
 
     Args:
     dataset: Xarray Dataset of sentinel images
-    a: fitting parameter [default = 2]
+    A: fitting parameter [default = 2]
 
     Returns:
     dataset: Xarray Dataset of sentinel images with delta-gamma-cr added as band
@@ -115,7 +115,7 @@ def calc_delta_cross_ratio(dataset: xr.Dataset, A: float = 2) -> xr.Dataset:
 
     # add delta-gamma-cr as band to dataset
 
-def calc_delta_gamma(dataset: xr.Dataset, b: float = 0.5) -> xr.Dataset:
+def calc_delta_gamma(dataset: xr.Dataset, B: float = 0.5) -> xr.Dataset:
     """
     Calculate change in combined gamma parameter (VV and cross-ratio) between 
     current time step and previous.
@@ -124,7 +124,7 @@ def calc_delta_gamma(dataset: xr.Dataset, b: float = 0.5) -> xr.Dataset:
 
     with:
     FCF - being the PROBA-V fraction forest cover (ranging from 0 to 1).
-    b - fitting parameter tested over 0 to 1 in steps of 0.1 and optimized at 0.5.
+    B - fitting parameter tested over 0 to 1 in steps of 0.1 and optimized at 0.5.
 
     Args:
     dataset: Xarray Dataset of sentinel images with delta-gamma-cr and delta-gamma-VV
@@ -289,14 +289,14 @@ def sentinel_1_clip_outliers(dataset: xr.Dataset) -> xr.Dataset:
 
     pass
 
-def snow_index_to_snow_depth(dataset: xr.Dataset, c: float = 0.44) -> xr.Dataset:
+def snow_index_to_snow_depth(dataset: xr.Dataset, C: float = 0.44) -> xr.Dataset:
     """
     Convert current snow-index to snow depth using the C parameter. Varied 
     from [0->1 by 0.01].
 
     Args:
     dataset: Xarray Dataset of sentinel images with snow index
-    c: fitting parameter
+    C: fitting parameter
 
     Returns:
     dataset: Xarray Dataset of sentinel images with retrieved snow depth
