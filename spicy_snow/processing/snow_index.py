@@ -5,57 +5,14 @@ Functions to calculate delta CR, delta VV, delta gamma, and snow index.
 import xarray as xr
 import numpy as np
 
-def add_band(dataset: xr.Dataset, dataArray: xr.DataArray, band_name: str, inplace: bool = False) -> xr.Dataset:
-    """
-    Add band to sentinel 1 datavariable in Dataset. The dataArray to add can have
-    multiple time steps and already exists.
-
-    Args:
-    dataset: Dataset containing sentinel-1 images
-    dataArray: dataArray to add to dataset
-    band_name: name for band, can already be in dataset
-    inplace: operate on dataset in place or return copy
-
-    Returns:
-    dataset: dataset with dataArray add to it at the dataArray's timeslice with
-    that band name.
-    """
-    # check inplace flag
-    if not inplace:
-        dataset = dataset.copy(deep=True)
-
-    # remove DataArrays coordinates so they don't concatenated only band dimension
-    dataArray = dataArray.reset_coords(names = ['flight_dir', 'platform', 'relative_orbit'], drop = True)
-    
-    # rename dataArrays band
-    dataArray['band'] = band_name
-
-    # if this is the first time adding this band
-    if band_name not in dataset.band:
-        # combine the 's1' dataArray and your new data on band
-        com_da = xr.concat([dataset['s1'], dataArray], dim = 'band')
-
-        # remove s1 from data variables to remerge
-        vars = list(dataset.data_vars)
-        vars.remove('s1')
-
-        # merge dataset sans sentinel1 with sentinel dataArray with new band
-        dataset = xr.merge([dataset[vars], com_da])
-    else:
-        # if band already in dataset just slice into data array time slices and add data
-        dataset['s1'].loc[dict(band = band_name, time = dataArray.time)] = dataArray
-
-    if not inplace:
-        return dataset
-
 def calc_delta_VV(dataset: xr.Dataset, inplace: bool = False) -> xr.Dataset:
     """
     Calculate change in VV amplitude between current time step and previous
-    from each relative orbit.
+    from each relative orbit and adds to dataset.
     
     delta-gamma-VV (i, t) = gamma-VV (i, t) - gamma-VV(i, t_previous)
 
-    Returns nans in band deltaVV for time slices with no previous image 
+    Returns nans in time slice of deltaVV with no previous image 
     (first of each relative orbit)
 
     Args:
@@ -63,7 +20,7 @@ def calc_delta_VV(dataset: xr.Dataset, inplace: bool = False) -> xr.Dataset:
     inplace: operate on dataset in place or return copy
 
     Returns:
-    dataset: Xarray Dataset of sentinel images with 'deltaVV' added as band
+    dataset: Xarray Dataset of sentinel images with 'deltaVV' added as data var
     """
     # check inplace flag
     if not inplace:
@@ -79,45 +36,44 @@ def calc_delta_VV(dataset: xr.Dataset, inplace: bool = False) -> xr.Dataset:
     for orbit in orbits:
         
         # Calculate change in gamma-VV between previous and current time step from the same relative orbit
-        diff = dataset['s1'].sel(time = dataset.relative_orbit == orbit, band = 'VV').diff(dim = 'time')
+        diffVV = dataset['s1'].sel(time = dataset.relative_orbit == orbit, band = 'VV').diff(dim = 'time')
         
-        # add delta-gamma-VV as band to dataset
-        dataset = add_band(dataset, diff, 'deltaVV')
+        # if adding new 
+        if 'deltaVV' not in dataset.data_vars:
+            # add delta-gamma-VV as variable to dataset
+            dataset['deltaVV'] = diffVV
+        
+        else:
+            # update deltaVV times with this. 
+            dataset['deltaVV'].loc[dict(time = diffVV.time)] = diffVV
     
     if not inplace:
         return dataset
 
-def calc_cross_ratio(dataset: xr.Dataset, A: float = 2) -> xr.Dataset:
+def calc_delta_cross_ratio(dataset: xr.Dataset, A: float = 2) -> xr.Dataset:
     """
-    Calculate cross-polarization ratio for all time steps.
+    Calculate change in cross-polarization ratio for all time steps.
     
+    delta-gamma-cr (i, t) = gamma-cr (i, t) - gamma-cr (i, t_previous)
+
+    with:
     gamma-cr = A * VH - VV
 
     and gamma-VH and gamma-VV in dB. Lieven's et al. 2021 tests A over [1, 2, 3]
     and fit to A = 2.
+
+    Returns nans in time slice of deltaCR with no previous image 
+    (first of each relative orbit)
 
     Args:
     dataset: Xarray Dataset of sentinel images
     A: fitting parameter [default = 2]
 
     Returns:
-    dataset: Xarray Dataset of sentinel images with gamma-cr added as band
+    dataset: Xarray Dataset of sentinel images with deltaCR added as data
     """
 
     # calculate cross ratio of VH to VV with fitting parameter A
-
-def calc_delta_cross_ratio(dataset: xr.Dataset) -> xr.Dataset:
-    """
-    Calculate change in cross-polarization ratio between current time step and previous.
-    
-    delta-gamma-cr (i, t) = gamma-cr (i, t) - gamma-cr (i, t_previous)
-
-    Args:
-    dataset: Xarray Dataset of sentinel images
-
-    Returns:
-    dataset: Xarray Dataset of sentinel images with delta-gamma-cr added as band
-    """
 
     # Identify previous image from the same relative orbit (6, 12, 18, or 24 days ago)
 
@@ -189,26 +145,6 @@ def calc_snow_index(dataset: xr.Dataset, previous_snow_index: xr.DataArray) -> x
 
     # add snow-index as band to dataset
 
-def calc_timesteps_weights(dataset: xr.Dataset) -> np.array:
-    """
-    Calculate weight for snow index effects of surrounding snow indexes
-
-    Matlab code: 
-    # make initial weights
-    wgts=repmat(win+1-abs([-win:win]),dim,1); [1, 2, 3, 4, 5, 6, 5, 4, 3, 2, 1]
-    # set no weights to steps steps without obs
-    wgts(isnan(si_tmp))=NaN;
-    # Reduce weight (e.g. by 3) for time steps with wet snow
-    wgts(wet_tmp==1)=wgts(wet_tmp==1)./3;
-
-    Args:
-    dataset: Xarray Dataset of sentinel images with snow-index
-
-    Returns:
-    weights: weights for 5, 11 days
-    """
-    pass
-
 def calc_prev_snow_index(dataset: xr.Dataset, weights: np.array) -> xr.DataArray:
     """
     Calculate previous snow index for +/- 5 days (6 day timestep) or +/- 11 days 
@@ -219,6 +155,7 @@ def calc_prev_snow_index(dataset: xr.Dataset, weights: np.array) -> xr.DataArray
     
     with:
         w_k: as the inverse distance in time from t_previous so for 6-days: 
+        wgts=repmat(win+1-abs([-win:win]),dim,1); [1, 2, 3, 4, 5, 6, 5, 4, 3, 2, 1]
         
     % Calculate average 
     si_pri(:,cnt)=nansum(wgts.*si_tmp,2)./nansum(wgts,2);

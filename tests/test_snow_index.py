@@ -29,9 +29,9 @@ class TestSnowIndex(unittest.TestCase):
 
         ds1 = calc_delta_VV(ds)
 
-        assert np.allclose(ds1['s1'].sel(band = 'deltaVV').isel(time = 1), real2_1_diff)
+        assert np.allclose(ds1['deltaVV'].isel(time = 1), real2_1_diff)
         
-        assert np.allclose(ds1['s1'].sel(band = 'deltaVV').isel(time = 2), real3_2_diff)
+        assert np.allclose(ds1['deltaVV'].isel(time = 2), real3_2_diff)
     
     def test_delta_vv_errors(self):
         """
