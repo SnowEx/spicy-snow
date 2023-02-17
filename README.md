@@ -5,7 +5,7 @@
 
 # spicy-snow
 
-Python module to use volumetric scattering at C-band to calculate snow depths from Sentinel-1 imagery using Hans Lieven et al.'s 2021 technique
+Python module to use volumetric scattering at C-band to calculate snow depths from Sentinel-1 imagery using Lieven et al.'s 2021 technique
 
 Lievens et al 2019 - https://www.nature.com/articles/s41467-019-12566-y
 - the original nature paper. Methods are at the bottom.
