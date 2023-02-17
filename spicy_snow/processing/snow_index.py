@@ -7,8 +7,8 @@ import numpy as np
 
 def add_band(dataset: xr.Dataset, dataArray: xr.DataArray, band_name: str, inplace: bool = False) -> xr.Dataset:
     """
-    Add band to sentinel 1 datavariable in Dataset. Can have multiple time steps
-    and already exists.
+    Add band to sentinel 1 datavariable in Dataset. The dataArray to add can have
+    multiple time steps and already exists.
 
     Args:
     dataset: Dataset containing sentinel-1 images
@@ -87,14 +87,11 @@ def calc_delta_VV(dataset: xr.Dataset, inplace: bool = False) -> xr.Dataset:
     if not inplace:
         return dataset
 
-def calc_delta_cross_ratio(dataset: xr.Dataset, A: float = 2) -> xr.Dataset:
+def calc_cross_ratio(dataset: xr.Dataset, A: float = 2) -> xr.Dataset:
     """
-    Calculate change in cross-polarization ratio between current time step and previous.
+    Calculate cross-polarization ratio for all time steps.
     
-    delta-gamma-cr (i, t) = gamma-cr (i, t) - gamma-cr (i, t_previous)
-
-    with:
-    gamma-cr = A * gamma-VH - gamma-VV
+    gamma-cr = A * VH - VV
 
     and gamma-VH and gamma-VV in dB. Lieven's et al. 2021 tests A over [1, 2, 3]
     and fit to A = 2.
@@ -104,12 +101,25 @@ def calc_delta_cross_ratio(dataset: xr.Dataset, A: float = 2) -> xr.Dataset:
     A: fitting parameter [default = 2]
 
     Returns:
+    dataset: Xarray Dataset of sentinel images with gamma-cr added as band
+    """
+
+    # calculate cross ratio of VH to VV with fitting parameter A
+
+def calc_delta_cross_ratio(dataset: xr.Dataset) -> xr.Dataset:
+    """
+    Calculate change in cross-polarization ratio between current time step and previous.
+    
+    delta-gamma-cr (i, t) = gamma-cr (i, t) - gamma-cr (i, t_previous)
+
+    Args:
+    dataset: Xarray Dataset of sentinel images
+
+    Returns:
     dataset: Xarray Dataset of sentinel images with delta-gamma-cr added as band
     """
 
     # Identify previous image from the same relative orbit (6, 12, 18, or 24 days ago)
-
-    # subtract VH and VV for current and previous time step with A parameter
 
     # Calculate change in gamma-cr between previous and current time step
 
@@ -136,6 +146,20 @@ def calc_delta_gamma(dataset: xr.Dataset, B: float = 0.5) -> xr.Dataset:
     # Calculate delta gamma from delta-gamma-cr, delta-gamma-VV and FCF
 
     # add delta-gamma as band to dataset
+
+def delta_gamma_mask_outlier(dataset: xr.Dataset) -> xr.Dataset: 
+    """
+    Clip delta gamma to -3 -> 3 dB
+
+    Args:
+    dataset: Xarray Dataset of sentinel images with delta-gamma
+
+    Returns:
+    dataset: Xarray Dataset of sentinel images with delt gamma changes clipped
+    to -3 -> 3
+    """
+
+    pass
 
 def calc_snow_index(dataset: xr.Dataset, previous_snow_index: xr.DataArray) -> xr.Dataset:
     """
@@ -216,78 +240,6 @@ def calc_prev_snow_index(dataset: xr.Dataset, weights: np.array) -> xr.DataArray
     # set snow-index to 0 for negative SIs and for IMS == 2 (land w/o snow-cover)
 
     # add snow-index as band to dataset
-
-def reduce_snow_index_snowfree(dataset: xr.Dataset) -> xr.Dataset: 
-    """
-    Reduce increment if prior date was still snowfree (to avoid jumps in shallow snow)
-    
-    # change in cross-pol and VV is reduced by 0.5 when past IMS snow cover is snow-free
-    dra_u(sc_pri==0)=0.5.*dra_u(sc_pri==0);
-    dvv_u(sc_pri==0)=0.5.*dvv_u(sc_pri==0);
-    
-    Args:
-    dataset: Xarray Dataset of sentinel images with delta-gamma
-
-    Returns:
-    dataset: Xarray Dataset of sentinel images with 2.5 +  reduced
-    for snow-free times
-    """
-    pass
-
-def reduce_snow_index_big_decreases(dataset: xr.Dataset) -> xr.Dataset: 
-    """
-    Reduce impact of strong decreases in backscatter 
-    (e.g. caused by rain on snow, or wet snow)
-    
-    # change in cross-pol and VV when change is decreasing more than 2.5
-    # if d_vv or d_cross < -2.5 then d_XX = -2.5 + 0.5 * (2.5 + d_XX)
-    dra_u(dra_u<-2.5)=-2.5+0.5.*(2.5+dra_u(dra_u<-2.5));  
-    dvv_u(dvv_u<-2.5)=-2.5+0.5.*(2.5+dvv_u(dvv_u<-2.5));  
-
-    Args:
-    dataset: Xarray Dataset of sentinel images with delta-gamma
-
-    Returns:
-    dataset: Xarray Dataset of sentinel images with big decreases mitigated
-    """
-
-    pass
-
-def reduce_snow_index_big_increases(dataset: xr.Dataset) -> xr.Dataset: 
-    """
-    Reduce impact of strong increases in backscatter 
-    (e.g. caused by (re)frost, or wet snow roughness)
-    
-    # change in cross-pol and VV when change is decreasing more than 2.5
-    # if d_vv or d_cross > 2.5 then d_XX = 2.5 + 0.5 * ( d_XX - 2.5)
-    dra_u(dra_u>2.5)=2.5+0.5.*(dra_u(dra_u>2.5)-2.5);
-    dvv_u(dvv_u>2.5)=2.5+0.5.*(dvv_u(dvv_u>2.5)-2.5);
-
-    Args:
-    dataset: Xarray Dataset of sentinel images with delta-gamma
-
-    Returns:
-    dataset: Xarray Dataset of sentinel images with big increases mitigated
-    """
-
-    pass
-
-def sentinel_1_clip_outliers(dataset: xr.Dataset) -> xr.Dataset: 
-    """
-    Clip changes to -3 -> 3 dB
-
-    dra_u(dra_u>3)=3; dra_u(dra_u<-3)=-3; 
-    dvv_u(dvv_u>3)=3; dvv_u(dvv_u<-3)=-3;
-
-    Args:
-    dataset: Xarray Dataset of sentinel images with delta-gamma
-
-    Returns:
-    dataset: Xarray Dataset of sentinel images with backscatter changes clipped
-    to -3 -> 3
-    """
-
-    pass
 
 def snow_index_to_snow_depth(dataset: xr.Dataset, C: float = 0.44) -> xr.Dataset:
     """
