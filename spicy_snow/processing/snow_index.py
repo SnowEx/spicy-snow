@@ -5,7 +5,89 @@ Functions to calculate delta CR, delta VV, delta gamma, and snow index.
 import xarray as xr
 import numpy as np
 
-def calc_delta_cross_ratio(dataset: xr.Dataset, a: float = 2) -> xr.Dataset:
+def add_band(dataset: xr.Dataset, dataArray: xr.DataArray, band_name: str, inplace: bool = False) -> xr.Dataset:
+    """
+    Add band to sentinel 1 datavariable in Dataset. Can have multiple time steps
+    and already exists.
+
+    Args:
+    dataset: Dataset containing sentinel-1 images
+    dataArray: dataArray to add to dataset
+    band_name: name for band, can already be in dataset
+    inplace: operate on dataset in place or return copy
+
+    Returns:
+    dataset: dataset with dataArray add to it at the dataArray's timeslice with
+    that band name.
+    """
+    # check inplace flag
+    if not inplace:
+        dataset = dataset.copy(deep=True)
+
+    # remove DataArrays coordinates so they don't concatenated only band dimension
+    dataArray = dataArray.reset_coords(names = ['flight_dir', 'platform', 'relative_orbit'], drop = True)
+    
+    # rename dataArrays band
+    dataArray['band'] = band_name
+
+    # if this is the first time adding this band
+    if band_name not in dataset.band:
+        # combine the 's1' dataArray and your new data on band
+        com_da = xr.concat([dataset['s1'], dataArray], dim = 'band')
+
+        # remove s1 from data variables to remerge
+        vars = list(dataset.data_vars)
+        vars.remove('s1')
+
+        # merge dataset sans sentinel1 with sentinel dataArray with new band
+        dataset = xr.merge([dataset[vars], com_da])
+    else:
+        # if band already in dataset just slice into data array time slices and add data
+        dataset['s1'].loc[dict(band = band_name, time = dataArray.time)] = dataArray
+
+    if not inplace:
+        return dataset
+
+def calc_delta_VV(dataset: xr.Dataset, inplace: bool = False) -> xr.Dataset:
+    """
+    Calculate change in VV amplitude between current time step and previous
+    from each relative orbit.
+    
+    delta-gamma-VV (i, t) = gamma-VV (i, t) - gamma-VV(i, t_previous)
+
+    Returns nans in band deltaVV for time slices with no previous image 
+    (first of each relative orbit)
+
+    Args:
+    dataset: Xarray Dataset of sentinel images
+    inplace: operate on dataset in place or return copy
+
+    Returns:
+    dataset: Xarray Dataset of sentinel images with 'deltaVV' added as band
+    """
+    # check inplace flag
+    if not inplace:
+        dataset = dataset.copy(deep=True)
+
+    # check for amp
+    if 's1_units' in dataset.attrs.keys():
+        assert dataset.attrs['s1_units'] == 'dB', 'Sentinel-1 units must be in dB'
+
+    # get all unique relative orbits
+    orbits = np.unique(dataset['relative_orbit'].values)
+
+    for orbit in orbits:
+        
+        # Calculate change in gamma-VV between previous and current time step from the same relative orbit
+        diff = dataset['s1'].sel(time = dataset.relative_orbit == orbit, band = 'VV').diff(dim = 'time')
+        
+        # add delta-gamma-VV as band to dataset
+        dataset = add_band(dataset, diff, 'deltaVV')
+    
+    if not inplace:
+        return dataset
+
+def calc_delta_cross_ratio(dataset: xr.Dataset, A: float = 2) -> xr.Dataset:
     """
     Calculate change in cross-polarization ratio between current time step and previous.
     
@@ -32,25 +114,6 @@ def calc_delta_cross_ratio(dataset: xr.Dataset, a: float = 2) -> xr.Dataset:
     # Calculate change in gamma-cr between previous and current time step
 
     # add delta-gamma-cr as band to dataset
-
-def calc_delta_VV(dataset: xr.Dataset) -> xr.Dataset:
-    """
-    Calculate change in VV amplitude between current time step and previous.
-    
-    delta-gamma-VV (i, t) = gamma-VV (i, t) - gamma-VV(i, t_previous)
-
-    Args:
-    dataset: Xarray Dataset of sentinel images
-
-    Returns:
-    dataset: Xarray Dataset of sentinel images with delta-gamma-VV added as band
-    """
-
-    # Identify previous image from the same relative orbit (6, 12, 18, or 24 days ago)
-
-    # Calculate change in gamma-VV between previous and current time step
-
-    # add delta-gamma-VV as band to dataset
 
 def calc_delta_gamma(dataset: xr.Dataset, b: float = 0.5) -> xr.Dataset:
     """
