@@ -1,6 +1,9 @@
 [![Contributors][contributors-shield]][contributors-url]
 [![Issues][issues-shield]][issues-url]
 [![MIT License][license-shield]][license-url]
+![version](https://img.shields.io/badge/version-0.0.0-green)
+
+<img src="https://github.com/SnowEx/spicy-snow/blob/main/title-img.png" width="1600">
 
 # spicy-snow
 Python module to use volumetric scattering at C-band to calculate snow depths from Sentinel-1 imagery using Hans Lieven et al.'s 2021 technique
