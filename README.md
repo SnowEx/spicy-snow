@@ -163,10 +163,11 @@ Zach Keskinen: zachary.keskinen@boisestate.edu
 
 Project Link: https://github.com/SnowEx/spicy-snow
 
-## Links to relevant repos
+## Links to relevant repos/sites
+
 Sentinel 1 Download:
 https://github.com/ASFHyP3/hyp3-sdk
-https://github.com/ericlindsey/sentinel_query_download
+https://github.com/asfadmin/Discovery-asf_search
 
 IMS Download:
 https://github.com/tylertucker202/tibet_snow_man/blob/master/tutorial/Tibet_snow_man_blog_entry.ipynb
@@ -174,6 +175,12 @@ https://github.com/guidocioni/snow_ims
 
 PROBA-V FCF Download:
 https://zenodo.org/record/3939050/files/PROBAV_LC100_global_v3.0.1_2019-nrt_Tree-CoverFraction-layer_EPSG-4326.tif
+
+Xarray:
+https://github.com/pydata/xarray
+
+Rioxarray:
+https://github.com/corteva/rioxarray
 
 <!-- MARKDOWN LINKS & IMAGES -->
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
