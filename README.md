@@ -155,6 +155,8 @@ Distributed under the MIT License. See `LICENSE` for more information.
 
 Readme template: https://github.com/othneildrew/Best-README-Template
 
+Title image: https://openai.com/dall-e-2/
+
 ## Contact
 
 Zach Keskinen: zachary.keskinen@boisestate.edu
