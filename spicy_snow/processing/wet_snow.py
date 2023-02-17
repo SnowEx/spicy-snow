@@ -73,13 +73,16 @@ def id_wet_snow(dataset: xr.Dataset, inplace: bool = False) -> xr.Dataset:
     # identify all relative orbits and loop
 
     # for each time step 
-    
+
         # set to wet if previous was wet
 
-        # if melting == True
+        # set to wet if melting == True
 
-        # if snow_index < negative and snow_cover = True
+        # set to wet if snow_index < negative and snow_cover = True
 
-        # set to dry if freezing == True
+        # set to dry if freezing == True and perma-wet = False
 
-        # set to dry if snow cover = False
+        # set to dry if snow cover = False and perma-wet = False
+
+        # if >50% wet of last 4 cycles after feb 1 then set remainer till
+        # august 1st to perma-wet(2?)
