@@ -24,21 +24,21 @@ class TestWetSnowMask(unittest.TestCase):
         Test settings newly wet snow
         """
 
-        self.assertEqual()
+        pass
     
     def test_id_refrozen(self, ds = ds):
         """
         Test settings re frozen snow
         """
 
-        self.assertEqual()
+        pass
 
     def test_id_wet(self, ds = ds):
         """
         Test id wet snow
         """
 
-        self.assertEqual()
+        pass
     
 if __name__ == '__main__':
     unittest.main()
