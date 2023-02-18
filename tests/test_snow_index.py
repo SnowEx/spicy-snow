@@ -8,7 +8,8 @@ import pickle
 import sys
 from os.path import expanduser
 sys.path.append(expanduser('./'))
-from spicy_snow.processing.snow_index import calc_delta_VV, calc_delta_cross_ratio
+from spicy_snow.processing.snow_index import calc_delta_VV, calc_delta_cross_ratio,\
+    calc_delta_gamma, clip_delta_gamma_outlier
 
 class TestSnowIndex(unittest.TestCase):
     """
@@ -74,3 +75,38 @@ class TestSnowIndex(unittest.TestCase):
         ds.attrs['s1_units'] = 'amp'
 
         self.assertRaises(AssertionError, calc_delta_cross_ratio, ds)
+    
+    def test_delta_gamma(self):
+        with open('./tests/test_data/2_img_ds', 'rb') as f:
+            ds = pickle.load(f)
+
+        ds = calc_delta_cross_ratio(ds)
+        ds = calc_delta_VV(ds)
+        ds = calc_delta_gamma(ds)
+        deltaG_calc = ds['deltaGamma'].values.ravel()
+        
+        fcf = ds['fcf']
+        cr = ds['deltaCR']
+        vv = ds['deltaVV']
+        B = 0.5
+        deltaG_real = (1 - fcf) * cr + (fcf * B * vv)
+        deltaG_real = deltaG_real.values.ravel()
+
+        assert np.allclose(deltaG_real[~np.isnan(deltaG_real)], deltaG_calc[~np.isnan(deltaG_calc)])
+    
+    def test_delta_gamma_clip(self):
+        with open('./tests/test_data/2_img_ds', 'rb') as f:
+            ds = pickle.load(f)
+
+        ds = calc_delta_cross_ratio(ds)
+        ds = calc_delta_VV(ds)
+        ds = calc_delta_gamma(ds)
+        old = ds.copy(deep = True)
+        ds = clip_delta_gamma_outlier(ds)
+
+        # assert max and min have been clipped        
+        self.assertEqual(ds['deltaGamma'].max(), 3, "Max should be 3 after clipping")
+        self.assertEqual(ds['deltaGamma'].min(), -3, "Min should be -3 after clipping")
+
+        # assert number of nans did not change
+        self.assertEqual(ds['deltaGamma'].isnull().sum(), old['deltaGamma'].isnull().sum())
