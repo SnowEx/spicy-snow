@@ -37,7 +37,7 @@ Lievens et al 2021 - https://tc.copernicus.org/articles/16/159/2022/
     - [x] Remove observations 3dB above 90th percentile or 3dB below 10th percentile
     - [x] Calculate \triangle \gamma_{CR} and \triangle \gamma_{VV}
     - [x] Calculate combined values \gamma
-    - [ ] Calculate previous SI using weighted +- 5 days SI
+    - [x] Calculate previous SI using weighted +- 5/11 days SI
     - [ ] Calculate SI and SD, uses snow cover from IMS too
     - [ ] Wet snow mask update based on -2dB or +2dB changes
     - [ ] Coarsen to appropriate resolution
