@@ -2,8 +2,9 @@
 Functions to calculate delta CR, delta VV, delta gamma, and snow index.
 """
 
-import xarray as xr
 import numpy as np
+import pandas as pd
+import xarray as xr
 
 def calc_delta_VV(dataset: xr.Dataset, inplace: bool = False) -> xr.Dataset:
     """
@@ -160,7 +161,61 @@ def clip_delta_gamma_outlier(dataset: xr.Dataset, thresh: float = 3, inplace: bo
     if not inplace:
         return dataset
 
-def calc_snow_index(dataset: xr.Dataset, previous_snow_index: xr.DataArray) -> xr.Dataset:
+def find_repeat_interval(dataset: xr.Dataset) -> pd.Timedelta:
+    """
+    Figures out if datasets repeat interval is 6 days or 12 days. Should raise error
+    if not multuple of 6 days.
+
+    Args:
+    dataset: dataset of sentinel-1 images
+
+    Returns:
+    repeat: pandas timedelta and number of days between images
+    """
+    # figure out if 6 or 12 days repeat
+    orbit_times = dataset.sel(time = dataset.relative_orbit == dataset['relative_orbit'][0]).time.diff(dim = 'time').values
+    repeat = np.nanmedian([pd.Timedelta(i).round('D') for i in orbit_times]).round('D')
+
+    assert repeat.days % 6 == 0, "Calculated repeat interval is not multiple of 6 days."
+
+    return repeat
+
+def calc_prev_snow_index(dataset: xr.Dataset, current_time: np.datetime64, repeat: pd.Timedelta) -> xr.DataArray:
+    """
+    Calculate previous snow index for +/- 5 days (6 day timestep) or +/- 11 days 
+    (12 day time step) from previous time step (6/12 days)'s snow index
+
+    SI (i, t_previous) = sum (t_pri - 5/11 days, t_pri + 5/11 days)(SI * weights) / sum(weights)
+
+    with:
+        w_k: as the inverse distance in time from t_previous so for 6-days: 
+        wgts=repmat(win+1-abs([-win:win]),dim,1); [1, 2, 3, 4, 5, 6, 5, 4, 3, 2, 1]
+
+    Args:
+    dataset: dataset of sentinel-1 images with 'snow-index' data variable
+    current_time: the current image date
+    repeat: is this region capturing s1 images every 6 or 12 days
+
+    Returns:
+    prev_si: the weighted average of previous snow indexes
+    """
+    # calculate how many days ago we are centering previous snow indexes (6 or 12 days)
+    t_prev = current_time - repeat
+    # get slice of +- 5 or +- 11 days depending on repeat interval
+    t_oldest, t_youngest = pd.to_datetime(t_prev - (repeat - pd.Timedelta('1 day'))) , pd.to_datetime(t_prev + (repeat - pd.Timedelta('1 day')))
+    # slice dataset to get all images in previous period
+    prev = dataset.sel(time = slice(t_oldest, t_youngest))
+    # calculate weights based on days between centered date and image acquistions
+    wts = repeat.days - np.abs([int((t - t_prev).days) for t in prev.time.values])
+    # calculate previous snow index weighted by time from last acquistion
+    prev_si = (prev['snow_index']*wts).sum(dim = 'time')/np.sum(wts)
+    # this is weird but works
+    # (prev['snow_index']*wts).sum(dim = 'time') treats nans as 0 so they don't
+    # propogate through time series (maybe a problem later for wet snow masking)
+
+    return prev_si
+
+def calc_snow_index(dataset: xr.Dataset, inplace: bool = False) -> xr.Dataset:
     """
     Calculate snow index for each time step from previous time steps' snow index
     weights, and current delta-gamma.
@@ -168,58 +223,35 @@ def calc_snow_index(dataset: xr.Dataset, previous_snow_index: xr.DataArray) -> x
     SI (i, t) = SI (i, t_previous) + delta-gamma (i, t)
 
     with SI (i, t_previous) as:
-        SI (i, t_previous) = 1 / (sum())
+        SI (i, t_previous) = sum (t_pri - 5/11 days, t_pri + 5/11 days)(SI * weights) / sum(weights)
 
     Args:
     dataset: Xarray Dataset of sentinel images with delta-gamma
+    inplace: operate on dataset in place or return copy
 
     Returns:
     dataset: Xarray Dataset of sentinel images with snow-index added as band
     """
+    # check inplace flag
+    if not inplace:
+        dataset = dataset.copy(deep=True)
 
-    # if August 1st - set snow index to 0 across image and continue
+    # set all snow index to 0 to start
+    dataset['snow_index'] = xr.zeros_like(dataset['deltaGamma'])
 
-    # Identify previous image from the same relative orbit (6, 12, 18, or 24 days ago)
+    # find repeat interval of dataset
+    repeat = find_repeat_interval(dataset)
 
-    # Calculate delta gamma from weighted average of +/- five images' SI 
-    # and current delta-gamma
-
-    # set snow-index to 0 for negative SIs and for IMS == 2 (land w/o snow-cover)
-
-    # add snow-index as band to dataset
-
-def calc_prev_snow_index(dataset: xr.Dataset, weights: np.array) -> xr.DataArray:
-    """
-    Calculate previous snow index for +/- 5 days (6 day timestep) or +/- 11 days 
-    (12 day time step) from previous time step (6/12 days)'s snow index
-
-    SI_prev (i, t_prev) = 1 / (sum (k = t - 5/11 days -> t + 5/11 days) weight (k)) \
-        * sum (k = t - 5/11 days -> t + 5/11 days) weight(k) SI (i, k)
+    # iterate through time steps
+    for ct in dataset.time.values:
+        # calculate previous snow index
+        prev_si = calc_prev_snow_index(dataset, ct, repeat)
+        # add deltaGamma to previous snow inded
+        dataset['snow_index'].loc[dict(time = ct)] = prev_si + dataset['deltaGamma'].sel(time = ct)
     
-    with:
-        w_k: as the inverse distance in time from t_previous so for 6-days: 
-        wgts=repmat(win+1-abs([-win:win]),dim,1); [1, 2, 3, 4, 5, 6, 5, 4, 3, 2, 1]
-        
-    % Calculate average 
-    si_pri(:,cnt)=nansum(wgts.*si_tmp,2)./nansum(wgts,2);
+    if not inplace:
+        return dataset
 
-    Args:
-    dataset: Xarray Dataset of sentinel images with delta-gamma
-
-    Returns:
-    DataArray: Xarray DataArray of previous snow-indexes weighted by time
-    """
-
-    # if August 1st - set snow index to 0 across image and continue
-
-    # Identify previous image from the same relative orbit (6, 12, 18, or 24 days ago)
-
-    # Calculate delta gamma from weighted average of +/- five images' SI 
-    # and current delta-gamma
-
-    # set snow-index to 0 for negative SIs and for IMS == 2 (land w/o snow-cover)
-
-    # add snow-index as band to dataset
 
 def snow_index_to_snow_depth(dataset: xr.Dataset, C: float = 0.44) -> xr.Dataset:
     """

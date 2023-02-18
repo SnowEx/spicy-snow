@@ -18,7 +18,7 @@ dates = ('2019-08-01', '2020-03-30')
 area = shapely.geometry.box(-115, 43, -114, 44)
 
 # Set skip = True to skip indented steps
-skip = False
+skip = True
 
 if not skip:
     os.makedirs('../data' , exist_ok = True)
@@ -39,8 +39,40 @@ if not skip:
     # dump completed dataset to data directory
 
     with open('../data/main_test.pkl', 'wb') as f:
-        ds = pickle.dump(ds, f)
+        pickle.dump(ds, f)
 
+    # If you want to load dataset for testing use this code:
+    with open('../data/main_test.pkl', 'rb') as f:
+            ds = pickle.load(f)
+
+    from spicy_snow.processing.s1_preprocessing import s1_amp_to_dB, merge_partial_s1_images
+
+    ds = ds.isel(time = slice(40))
+    print('converting amp to dB')
+    s1_amp_to_dB(ds, inplace = True)
+
+    # If you want to load dataset for testing use this code:
+    with open('../data/main_test_proc.pkl', 'wb') as f:
+        pickle.dump(ds, f)
+from spicy_snow.processing.s1_preprocessing import s1_amp_to_dB, merge_partial_s1_images
 # If you want to load dataset for testing use this code:
-# with open('../data/main_test.pkl', 'rb') as f:
-    #     ds = pickle.dump(f)
+with open('../data/main_test.pkl', 'rb') as f:
+        ds = pickle.load(f)
+ds = ds.isel(time = slice(40))
+print('merging')
+ds = merge_partial_s1_images(ds)
+
+# import the function to test
+from spicy_snow.processing.snow_index import calc_delta_VV, calc_delta_cross_ratio, \
+    calc_delta_gamma, clip_delta_gamma_outlier
+print('calculating CR')
+calc_delta_cross_ratio(ds, inplace = True)
+print('calculating delta VV')
+calc_delta_VV(ds, inplace = True)
+print('calculating delta gamma')
+calc_delta_gamma(ds, inplace = True)
+clip_delta_gamma_outlier(ds, inplace = True)
+print('saving processed dataset')
+# If you want to load dataset for testing use this code:
+with open('../data/main_test_proc.pkl', 'wb') as f:
+        pickle.dump(ds, f)
