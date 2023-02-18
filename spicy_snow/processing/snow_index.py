@@ -136,7 +136,7 @@ def calc_delta_gamma(dataset: xr.Dataset, B: float = 0.5, inplace: bool = False)
     if not inplace:
         return dataset
 
-def clip_delta_gamma_outlier(dataset: xr.Dataset, thres: float = 3, inplace: bool = False) -> xr.Dataset: 
+def clip_delta_gamma_outlier(dataset: xr.Dataset, thresh: float = 3, inplace: bool = False) -> xr.Dataset: 
     """
     Clip delta gamma to -3 -> 3 dB
 
@@ -152,10 +152,10 @@ def clip_delta_gamma_outlier(dataset: xr.Dataset, thres: float = 3, inplace: boo
         dataset = dataset.copy(deep=True)
 
     # change values above 3 and not nan to 3
-    dataset['deltaGamma'] = dataset['deltaGamma'].where((dataset['deltaGamma'] < thres) & ~dataset['deltaGamma'].isnull(), thres)
+    dataset['deltaGamma'] = dataset['deltaGamma'].where((dataset['deltaGamma'] < thresh) | dataset['deltaGamma'].isnull(), thresh)
     
     # change values below -3 and not nan to -3
-    dataset['deltaGamma'] = dataset['deltaGamma'].where((dataset['deltaGamma'] > -thres) & ~dataset['deltaGamma'].isnull(), -thres)
+    dataset['deltaGamma'] = dataset['deltaGamma'].where((dataset['deltaGamma'] > -thresh) | dataset['deltaGamma'].isnull(), -thresh)
     
     if not inplace:
         return dataset
