@@ -107,7 +107,7 @@ def calc_delta_cross_ratio(dataset: xr.Dataset, A: float = 2, inplace: bool = Fa
     if not inplace:
         return dataset
 
-def calc_delta_gamma(dataset: xr.Dataset, B: float = 0.5) -> xr.Dataset:
+def calc_delta_gamma(dataset: xr.Dataset, B: float = 0.5, inplace: bool = False) -> xr.Dataset:
     """
     Calculate change in combined gamma parameter (VV and cross-ratio) between 
     current time step and previous.
@@ -124,12 +124,19 @@ def calc_delta_gamma(dataset: xr.Dataset, B: float = 0.5) -> xr.Dataset:
     Returns:
     dataset: Xarray Dataset of sentinel images with delta-gamma added as band
     """
+    # check inplace flag
+    if not inplace:
+        dataset = dataset.copy(deep=True)
 
     # Calculate delta gamma from delta-gamma-cr, delta-gamma-VV and FCF
-
     # add delta-gamma as band to dataset
+    dataset['deltaGamma'] = (1 - dataset['fcf']) * dataset['deltaCR'] + \
+        (dataset['fcf'] * B * dataset['deltaVV'])
 
-def delta_gamma_mask_outlier(dataset: xr.Dataset) -> xr.Dataset: 
+    if not inplace:
+        return dataset
+
+def clip_delta_gamma_outlier(dataset: xr.Dataset, thres: float = 3, inplace: bool = False) -> xr.Dataset: 
     """
     Clip delta gamma to -3 -> 3 dB
 
@@ -137,11 +144,21 @@ def delta_gamma_mask_outlier(dataset: xr.Dataset) -> xr.Dataset:
     dataset: Xarray Dataset of sentinel images with delta-gamma
 
     Returns:
-    dataset: Xarray Dataset of sentinel images with delt gamma changes clipped
+    dataset: Xarray Dataset of sentinel images with delta gamma changes clipped
     to -3 -> 3
     """
+    # check inplace flag
+    if not inplace:
+        dataset = dataset.copy(deep=True)
 
-    pass
+    # change values above 3 and not nan to 3
+    dataset['deltaGamma'] = dataset['deltaGamma'].where((dataset['deltaGamma'] < thres) & ~dataset['deltaGamma'].isnull(), thres)
+    
+    # change values below -3 and not nan to -3
+    dataset['deltaGamma'] = dataset['deltaGamma'].where((dataset['deltaGamma'] > -thres) & ~dataset['deltaGamma'].isnull(), -thres)
+    
+    if not inplace:
+        return dataset
 
 def calc_snow_index(dataset: xr.Dataset, previous_snow_index: xr.DataArray) -> xr.Dataset:
     """
