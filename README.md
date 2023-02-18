@@ -17,9 +17,9 @@ Lievens et al 2021 - https://tc.copernicus.org/articles/16/159/2022/
 
 ## Proposed Roadmap
 
-- [ ] Design planning
-- [ ] Pseudo-code
-- [ ] Tests
+- [x] Design planning
+- [x] Pseudo-code
+- [ ] Logging system
 
 - [ ] User Inputs: 
     - [ ] dates 
@@ -35,15 +35,17 @@ Lievens et al 2021 - https://tc.copernicus.org/articles/16/159/2022/
 - [ ] Processing steps
     - [x] Rescale by mean for all orbits to overall mean
     - [x] Remove observations 3dB above 90th percentile or 3dB below 10th percentile
-    - [ ] Calculate \triangle \gamma_{CR} and \triangle \gamma_{VV}
-    - [ ] Calculate combined values \gamma
-    - [ ] Calculate SI and SD, uses snow cover form IMS too
-    - [ ] Set tuning parameters: A = 2, B = 0.5, C = 0.44
+    - [x] Calculate \triangle \gamma_{CR} and \triangle \gamma_{VV}
+    - [x] Calculate combined values \gamma
+    - [ ] Calculate previous SI using weighted +- 5 days SI
+    - [ ] Calculate SI and SD, uses snow cover from IMS too
     - [ ] Wet snow mask update based on -2dB or +2dB changes
     - [ ] Coarsen to appropriate resolution
 
 - [ ] Output: 
     - [ ] xarray netcdf of snow depths
+    
+- [ ] Tests
 
 ## Example Installation
 
