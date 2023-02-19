@@ -109,7 +109,7 @@ def hyp3_pipeline(search_results: pd.DataFrame, job_name, existing_job_name = Fa
     # check if you have passed quota
     quota = hyp3.check_quota()
     if not quota or len(search_results) > hyp3.check_quota():
-        print(f'More search results ({len(searh_results)}) than quota ({quota}).')
+        print(f'More search results ({len(search_results)}) than quota ({quota}).')
         resp = None
         while resp not in ['Y', 'N']:
             resp = input('Continue anyways?')[:1].upper()
