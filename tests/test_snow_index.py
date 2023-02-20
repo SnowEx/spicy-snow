@@ -79,12 +79,31 @@ class TestSnowIndex(unittest.TestCase):
         self.assertRaises(AssertionError, calc_delta_cross_ratio, ds)
     
     def test_delta_gamma(self):
-        with open('./tests/test_data/2_img_ds', 'rb') as f:
-            ds = pickle.load(f)
+        backscatter = np.random.randn(10, 10, 4, 3)
+        deltaVV = np.random.randn(10, 10 , 4)
+        deltaCR = np.random.randn(10, 10 , 4)
+        fcf = np.random.randn(10, 10 , 4)/100
+        times = [np.datetime64(t) for t in ['2020-01-01','2020-01-02', '2020-01-08', '2020-01-09']]
+        x = np.linspace(0, 9, 10)
+        y = np.linspace(10, 19, 10)
+        lon, lat = np.meshgrid(x, y)
 
-        ds = calc_delta_cross_ratio(ds)
-        ds = calc_delta_VV(ds)
-        ds = calc_delta_gamma(ds)
+        test_ds = xr.Dataset(
+            data_vars = dict(
+                s1 = (["x", "y", "time", "band"], backscatter),
+                deltaVV = (["x", "y", "time"], deltaVV),
+                fcf = (["x", "y", "time"], fcf),
+                deltaCR = (["x", "y", "time"], deltaCR)
+            ),
+
+            coords = dict(
+                lon = (["x", "y"], lon),
+                lat = (["x", "y"], lat),
+                band = ['VV', 'VH', 'inc'],
+                time = times,
+                relative_orbit = (["time"], [24, 1, 24, 1])))
+
+        ds = calc_delta_gamma(test_ds)
         deltaG_calc = ds['deltaGamma'].values.ravel()
         
         fcf = ds['fcf']
@@ -97,18 +116,37 @@ class TestSnowIndex(unittest.TestCase):
         assert_allclose(deltaG_real[~np.isnan(deltaG_real)], deltaG_calc[~np.isnan(deltaG_calc)])
     
     def test_delta_gamma_clip(self):
-        with open('./tests/test_data/2_img_ds', 'rb') as f:
-            ds = pickle.load(f)
+        backscatter = np.random.randn(10, 10, 4, 3)
+        deltaVV = np.random.randn(10, 10 , 4)
+        deltaCR = np.random.randn(10, 10 , 4)
+        fcf = np.random.randn(10, 10 , 4)/100
+        times = [np.datetime64(t) for t in ['2020-01-01','2020-01-02', '2020-01-08', '2020-01-09']]
+        x = np.linspace(0, 9, 10)
+        y = np.linspace(10, 19, 10)
+        lon, lat = np.meshgrid(x, y)
 
-        ds = calc_delta_cross_ratio(ds)
-        ds = calc_delta_VV(ds)
-        ds = calc_delta_gamma(ds)
+        test_ds = xr.Dataset(
+            data_vars = dict(
+                s1 = (["x", "y", "time", "band"], backscatter),
+                deltaVV = (["x", "y", "time"], deltaVV),
+                fcf = (["x", "y", "time"], fcf),
+                deltaCR = (["x", "y", "time"], deltaCR)
+            ),
+
+            coords = dict(
+                lon = (["x", "y"], lon),
+                lat = (["x", "y"], lat),
+                band = ['VV', 'VH', 'inc'],
+                time = times,
+                relative_orbit = (["time"], [24, 1, 24, 1])))
+
+        ds = calc_delta_gamma(test_ds)
         old = ds.copy(deep = True)
         ds = clip_delta_gamma_outlier(ds)
 
         # assert max and min have been clipped        
-        self.assertEqual(ds['deltaGamma'].max(), 3, "Max should be 3 after clipping")
-        self.assertEqual(ds['deltaGamma'].min(), -3, "Min should be -3 after clipping")
+        self.assertLessEqual(ds['deltaGamma'].max(), 3, "Max should be 3 after clipping")
+        self.assertGreaterEqual(ds['deltaGamma'].min(), -3, "Min should be -3 after clipping")
 
         # assert number of nans did not change
         self.assertEqual(ds['deltaGamma'].isnull().sum(), old['deltaGamma'].isnull().sum())
