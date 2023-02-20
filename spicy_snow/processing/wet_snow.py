@@ -18,14 +18,21 @@ def id_new_wet_snow(dataset: xr.Dataset, wet_thresh: int = -2, inplace: bool = F
     Returns:
     dataset: xarray data with melting data var
     """
+    # check inplace flag
+    if not inplace:
+        dataset = dataset.copy(deep=True)
+
+    # add wet_flag to dataset if not already present    
+    if 'wet_flag' not in dataset.data_vars:
+        dataset['wet_flag'] = xr.zeros_like(dataset['deltaVV'])
 
     # identify possible newly wet snow in regions FCF < 0.5 with deltaCR
-
+    dataset['wet_flag'] = dataset['wet_flag'].where(((dataset['fcf'] > 0.5) | (dataset['deltaCR'] > wet_thresh)), 1)
     # identify possible newly wet snow in regions FCF > 0.5 with deltaVV
+    dataset['wet_flag'] = dataset['wet_flag'].where(((dataset['fcf'] < 0.5) | (dataset['deltaVV'] > wet_thresh)), 1)
 
-    # add melting as data variable to dataset
-
-    pass
+    if not inplace:
+        return dataset
 
 def id_newly_frozen_snow(dataset: xr.Dataset, freeze_thresh: int = 2, inplace: bool = False) -> xr.Dataset:
     """
@@ -40,10 +47,32 @@ def id_newly_frozen_snow(dataset: xr.Dataset, freeze_thresh: int = 2, inplace: b
     Returns:
     dataset: xarray data with freezing data var
     """
+    # check inplace flag
+    if not inplace:
+        dataset = dataset.copy(deep=True)
+
+    # add wet_flag to dataset if not already present    
+    if 'wet_flag' not in dataset.data_vars:
+        dataset['wet_flag'] = xr.zeros_like(dataset['deltaVV'])
 
     # identify possible re-freezing by increases of deltaGammaNaught of 2dB
+    dataset['wet_flag'] = dataset['wet_flag'].where(dataset['deltaGamma'] < freeze_thresh, -1)
 
-    # add freezing as data variable to dataset
+    if not inplace:
+        return dataset
+
+def id_wet_negative_si(dataset: xr.Dataset, inplace: bool = False) -> xr.Dataset:
+    """
+    Additional wet snow criteria if sd retrieval (snow-index since they are linear)
+    becomes negative with snow cover is present we set pixel to wet.
+
+    Args:
+    dataset: xarray dataset with snow_index as data vars
+    inplace: return copy of dataset or operate on dataset inplace?
+
+    Returns:
+    dataset: xarray data with wet_snow data var
+    """
 
     pass
 
@@ -54,15 +83,12 @@ def id_wet_snow(dataset: xr.Dataset, inplace: bool = False) -> xr.Dataset:
     as wet until either end of time series or next re-freezing.
 
     If re-freezing revert to set all as dry until next melt. Repeat to end of time series.
-
-    Additional wet snow criteria if sd retrieval (snow-index since they are linear)
-    becomes negative with snow cover is present we set pixel to wet. 
     
     If after Feburary 1st until August 1st if last two of four relative orbits
     were classified as wet we set remained to wet to stop retrievals
 
     Args:
-    dataset: xarray dataset with melting, freezing, snow_index as data vars
+    dataset: xarray dataset with melting, freezing as data vars
     inplace: return copy of dataset or operate on dataset inplace?
 
     Returns:
