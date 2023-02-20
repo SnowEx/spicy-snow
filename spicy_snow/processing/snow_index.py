@@ -253,7 +253,7 @@ def calc_snow_index(dataset: xr.Dataset, inplace: bool = False) -> xr.Dataset:
         return dataset
 
 
-def snow_index_to_snow_depth(dataset: xr.Dataset, C: float = 0.44) -> xr.Dataset:
+def calc_snow_index_to_snow_depth(dataset: xr.Dataset, C: float = 0.44, inplace: bool = False) -> xr.Dataset:
     """
     Convert current snow-index to snow depth using the C parameter. Varied 
     from [0->1 by 0.01].
@@ -261,9 +261,16 @@ def snow_index_to_snow_depth(dataset: xr.Dataset, C: float = 0.44) -> xr.Dataset
     Args:
     dataset: Xarray Dataset of sentinel images with snow index
     C: fitting parameter
+    inplace: operate on dataset in place or return copy
 
     Returns:
     dataset: Xarray Dataset of sentinel images with retrieved snow depth
     """
+    # check inplace flag
+    if not inplace:
+        dataset = dataset.copy(deep=True)
+    
+    dataset['snow_depth'] = dataset['snow_index'] * C
 
-    pass
+    if not inplace:
+        return dataset

@@ -11,7 +11,7 @@ from os.path import expanduser
 sys.path.append(expanduser('./'))
 from spicy_snow.processing.snow_index import calc_delta_VV, calc_delta_cross_ratio,\
     calc_delta_gamma, clip_delta_gamma_outlier, find_repeat_interval, \
-    calc_prev_snow_index, calc_snow_index
+    calc_prev_snow_index, calc_snow_index, calc_snow_index_to_snow_depth
 
 class TestSnowIndex(unittest.TestCase):
     """
@@ -352,3 +352,35 @@ class TestSnowIndex(unittest.TestCase):
 
         # should be snowindex at t==0 (0) * 6 + si @ t == 1 (which is deltaGamma @ t=1) * 5 / (6 + 5) + deltaGamma @ t = 2 
         assert_allclose(ds['snow_index'].isel(time = 2), ds['snow_index'].isel(time = 1)*5/(6+5) + ds['deltaGamma'].isel(time = 2))
+
+    def test_snow_index_to_depth(self):
+
+        backscatter = np.random.randn(10, 10, 3, 3)
+        snow_index = np.random.randn(10, 10 , 3)
+        times = [np.datetime64(t) for t in ['2020-01-01', '2020-01-07', '2020-01-14']]
+        x = np.linspace(0, 9, 10)
+        y = np.linspace(10, 19, 10)
+        lon, lat = np.meshgrid(x, y)
+
+        test_ds = xr.Dataset(
+            data_vars = dict(
+                s1 = (["x", "y", "time", "band"], backscatter),
+                snow_index = (["x", "y", "time"], snow_index)
+            ),
+
+            coords = dict(
+                lon = (["x", "y"], lon),
+                lat = (["x", "y"], lat),
+                band = ['VV', 'VH', 'inc'],
+                time = times,
+                relative_orbit = (["time"], [24, 24, 24])))
+        
+        test_ds['snow_index'].loc[dict(time = '2020-01-01')] = 1
+        test_ds['snow_index'].loc[dict(time = '2020-01-07')] = 3
+
+        ds = calc_snow_index_to_snow_depth(test_ds, C = 0.6)
+
+        assert_allclose(ds['snow_depth'].isel(time = 0), test_ds['snow_index'].isel(time = 0)*0.6)
+
+        assert_allclose(ds['snow_depth'].isel(time = 1), test_ds['snow_index'].isel(time = 1)*0.6)
+
