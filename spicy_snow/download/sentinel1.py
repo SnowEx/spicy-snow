@@ -17,11 +17,14 @@ from tqdm import tqdm
 import hyp3_sdk as sdk
 from hyp3_sdk.exceptions import AuthenticationError
 
-from typing import Dict
+from typing import Dict, Tuple, List
 
+import sys
+from os.path import expanduser
+sys.path.append(expanduser('~/Documents/spicy-snow'))
 from spicy_snow.utils.download import url_download
 
-def s1_img_search(area: shapely.geometry.box, dates: (str, str)) -> pd.DataFrame:
+def s1_img_search(area: shapely.geometry.box, dates: Tuple[str]) -> pd.DataFrame:
     """
     find dates and url of Sentinel-1 overpasses
 
