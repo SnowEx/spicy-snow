@@ -82,7 +82,9 @@ class TestSnowIndex(unittest.TestCase):
         backscatter = np.random.randn(10, 10, 4, 3)
         deltaVV = np.random.randn(10, 10 , 4)
         deltaCR = np.random.randn(10, 10 , 4)
-        fcf = np.random.randn(10, 10 , 4)/100
+        fcf = np.random.randn(10, 10 , 4)/100 + 0.5
+        fcf[fcf < 0] = 0
+        fcf[fcf > 1] = 1
         times = [np.datetime64(t) for t in ['2020-01-01','2020-01-02', '2020-01-08', '2020-01-09']]
         x = np.linspace(0, 9, 10)
         y = np.linspace(10, 19, 10)
@@ -119,7 +121,9 @@ class TestSnowIndex(unittest.TestCase):
         backscatter = np.random.randn(10, 10, 4, 3)
         deltaVV = np.random.randn(10, 10 , 4)
         deltaCR = np.random.randn(10, 10 , 4)
-        fcf = np.random.randn(10, 10 , 4)/100
+        fcf = np.random.randn(10, 10 , 4)/100 + 0.5
+        fcf[fcf < 0] = 0
+        fcf[fcf > 1] = 1
         times = [np.datetime64(t) for t in ['2020-01-01','2020-01-02', '2020-01-08', '2020-01-09']]
         x = np.linspace(0, 9, 10)
         y = np.linspace(10, 19, 10)

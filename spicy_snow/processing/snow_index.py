@@ -131,6 +131,7 @@ def calc_delta_gamma(dataset: xr.Dataset, B: float = 0.5, inplace: bool = False)
 
     # check to ensure fcf is 0-1 not 0-100
     assert dataset['fcf'].max() <= 1, "Forest cover fraction must be scaled 0-1"
+    assert dataset['fcf'].min() >= 0, "Forest cover fraction must be scaled 0-1"
 
     # Calculate delta gamma from delta-gamma-cr, delta-gamma-VV and FCF
     # add delta-gamma as band to dataset
