@@ -5,7 +5,7 @@ import os
 from os.path import join
 import xarray as xr
 import shapely.geometry
-from typing import Tuple
+from typing import Tuple, Union
 
 # Add main repo to path
 import sys
