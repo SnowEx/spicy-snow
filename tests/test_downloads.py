@@ -14,6 +14,7 @@ import sys
 from os.path import expanduser
 sys.path.append(expanduser('.'))
 from spicy_snow.download.sentinel1 import s1_img_search, combine_s1_images
+from spicy_snow.utils.raster import to01
 
 class TestSentinel1Search(unittest.TestCase):
     """
@@ -80,6 +81,8 @@ class TestSentinel1Search(unittest.TestCase):
     'S1A_IW_GRDH_1SDV_20200124T135002_20200124T135027_030943_038D6F_FED5']
     for i in range(5):
         backscatter = np.random.randn(10, 10, 3)
+        backscatter = to01(backscatter)
+
         x = np.linspace(0, 9, 10)
         y = np.linspace(10, 19, 10)
         lon, lat = np.meshgrid(x, y)
@@ -88,7 +91,11 @@ class TestSentinel1Search(unittest.TestCase):
             dims = ["x","y","band"],
             coords = dict(
                 lon=(["x", "y"], lon),
-                lat=(["x", "y"], lat)))
+                lat=(["x", "y"], lat),
+                band = ['VV', 'VH', 'inc'],
+                )
+        )
+        
         das[granules[i]] = da
 
     def test_combine_s1_imgs(self, das = das):
@@ -104,9 +111,14 @@ class TestSentinel1Search(unittest.TestCase):
         self.assertEqual(len(ds.band), 3)
 
         self.assertEqual(ds.attrs['s1_units'], 'dB')
-        self.assertEqual(ds.attrs['resolution'], '30')
+        self.assertEqual(ds.attrs['resolution'], '90')
 
-        assert_allclose(das['S1B_IW_GRDH_1SDV_20200127T012726_20200127T012751_019996_025D37_D0F0'], ds.isel(time = 2)['s1'])
+        expected_t2 = das['S1B_IW_GRDH_1SDV_20200127T012726_20200127T012751_019996_025D37_D0F0'].coarsen(x = 3, boundary = 'trim').mean().coarsen(y = 3, boundary = 'trim').mean()
+        expected_t2.loc[dict(band = ['VV', 'VH'])] = 10 * np.log10(expected_t2.sel(band = ['VV', 'VH']))
+
+        self.assertEqual(ds.isel(time = 0)['s1'].shape, (3, 3, 3))
+
+        assert_allclose(expected_t2, ds.isel(time = 2)['s1'])
 
 if __name__ == '__main__':
     unittest.main()

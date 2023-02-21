@@ -8,7 +8,7 @@ import pickle
 import sys
 from os.path import expanduser
 sys.path.append(expanduser('./'))
-from spicy_snow.processing.s1_preprocessing import s1_amp_to_dB, s1_dB_to_amp, \
+from spicy_snow.processing.s1_preprocessing import s1_power_to_dB, s1_dB_to_power, \
     merge_partial_s1_images, s1_clip_outliers, s1_orbit_averaging, subset_s1_images, \
     merge_s1_subsets
 
@@ -27,7 +27,7 @@ class TestSentinel1PreProcessing(unittest.TestCase):
         amp = ds['s1'].isel(time = 0).sel(band = 'VV').values.ravel()
         amp = amp[amp != 0]
 
-        ds_dB = s1_amp_to_dB(ds)
+        ds_dB = s1_power_to_dB(ds)
 
         dB = ds_dB['s1'].isel(time = 0).sel(band = 'VV').values.ravel()
         dB = dB[~np.isnan(dB)]
@@ -43,7 +43,7 @@ class TestSentinel1PreProcessing(unittest.TestCase):
 
         ds['s1'].isel(time = 0).sel(band = 'VV')[100, 100] = 0
 
-        ds_dB = s1_amp_to_dB(ds)
+        ds_dB = s1_power_to_dB(ds)
 
         assert(np.isnan(ds_dB['s1'].isel(time = 0).sel(band = 'VV')[100, 100]))
     
@@ -57,10 +57,10 @@ class TestSentinel1PreProcessing(unittest.TestCase):
 
         amp_original = ds['s1'].isel(time = 0).sel(band = 'VV').values.ravel()
 
-        ds_dB = s1_amp_to_dB(ds)
+        ds_dB = s1_power_to_dB(ds)
         dB = ds_dB['s1'].isel(time = 0).sel(band = 'VV').values.ravel()
 
-        ds_amp = s1_dB_to_amp(ds_dB)
+        ds_amp = s1_dB_to_power(ds_dB)
         amp = ds_amp['s1'].isel(time = 0).sel(band = 'VV').values.ravel()
 
         assert(np.allclose(amp, amp_original))

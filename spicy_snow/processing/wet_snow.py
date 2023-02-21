@@ -95,7 +95,7 @@ def id_wet_negative_si(dataset: xr.Dataset, inplace: bool = False) -> Union[None
           f"Missing variables {necessary_vars.difference(set(dataset.data_vars))}"
 
     # add alt_wet_flag to dataset if not already present    
-    if 'wet_flag' not in dataset.data_vars:
+    if 'alt_wet_flag' not in dataset.data_vars:
         dataset['alt_wet_flag'] = xr.zeros_like(dataset['deltaVV'])
 
     # identify wetting of snow by negative snow index with snow present
@@ -167,18 +167,22 @@ def flag_wet_snow(dataset: xr.Dataset, inplace: bool = False) -> Union[None, xr.
     
         melt_season = (dataset['time.month'] > 1) & (dataset['time.month'] < 8)
         melt_orbit = (melt_season & (dataset.relative_orbit == orbit))
-        dataset['perma_wet'].loc[dict(time = melt_orbit)] = \
-            dataset['wet_flag'].loc[dict(time = melt_orbit)]
+
+        # check if there are at least 4 time slices in melt season for this orbit
         
-        dataset['perma_wet'].loc[dict(time = melt_orbit)] = dataset['perma_wet'].loc[dict(time = melt_orbit)] + \
-            dataset['alt_wet_flag'].loc[dict(time = melt_orbit)]
-        
-        dataset['perma_wet'].loc[dict(time = melt_orbit)] = \
-            dataset['perma_wet'].loc[dict(time = melt_orbit)].where(dataset['perma_wet'].loc[dict(time = melt_orbit)] <= 1 , 1)
-        dataset['perma_wet'].loc[dict(time = melt_orbit)] = \
-            dataset['perma_wet'].loc[dict(time = melt_orbit)].rolling(time = 4).mean()
-        dataset['perma_wet'].loc[dict(time = melt_orbit)] = \
-            dataset['perma_wet'].loc[dict(time = melt_orbit)].rolling(time = len(orbit_dataset.time), min_periods = 1).max()
+        if len(dataset.loc[dict(time = melt_orbit)]) > 4:
+            dataset['perma_wet'].loc[dict(time = melt_orbit)] = \
+                dataset['wet_flag'].loc[dict(time = melt_orbit)]
+            
+            dataset['perma_wet'].loc[dict(time = melt_orbit)] = dataset['perma_wet'].loc[dict(time = melt_orbit)] + \
+                dataset['alt_wet_flag'].loc[dict(time = melt_orbit)]
+            
+            dataset['perma_wet'].loc[dict(time = melt_orbit)] = \
+                dataset['perma_wet'].loc[dict(time = melt_orbit)].where(dataset['perma_wet'].loc[dict(time = melt_orbit)] <= 1 , 1)
+            dataset['perma_wet'].loc[dict(time = melt_orbit)] = \
+                dataset['perma_wet'].loc[dict(time = melt_orbit)].rolling(time = 4).mean()
+            dataset['perma_wet'].loc[dict(time = melt_orbit)] = \
+                dataset['perma_wet'].loc[dict(time = melt_orbit)].rolling(time = len(orbit_dataset.time), min_periods = 1).max()
         
     dataset['perma_wet'] = dataset['perma_wet'].where(~dataset['perma_wet'].isnull(), 0)
     dataset['wet_snow'] = dataset['wet_snow'].where(dataset['perma_wet'] < 0.5, 1)

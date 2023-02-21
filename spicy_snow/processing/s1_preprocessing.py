@@ -12,7 +12,7 @@ import rioxarray
 from rioxarray.merge import merge_arrays
 from itertools import product
 
-def s1_amp_to_dB(dataset: xr.Dataset, inplace: bool = False):
+def s1_power_to_dB(dataset: xr.Dataset, inplace: bool = False):
     """
     Convert s1 images from amplitude to dB
 
@@ -40,10 +40,11 @@ def s1_amp_to_dB(dataset: xr.Dataset, inplace: bool = False):
     dataset['s1'].loc[dict(band = ['VV','VH'])] = 10 * np.log10(dataset['s1'].sel(band = ['VV','VH']))
 
     dataset.attrs['s1_units'] = 'dB'
+    
     if not inplace:
         return dataset
 
-def s1_dB_to_amp(dataset: xr.Dataset, inplace: bool = False):
+def s1_dB_to_power(dataset: xr.Dataset, inplace: bool = False):
     """
     Convert s1 images from dB to amp
 

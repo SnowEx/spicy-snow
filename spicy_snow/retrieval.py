@@ -33,7 +33,7 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
                         dates: Tuple[str, str], 
                         work_dir: str = './',
                         job_name: str = 'spicy-snow-run',
-                        existing_job_name: Union[bool, None] = False) -> xr.Dataset:
+                        existing_job_name: Union[str, None] = False) -> xr.Dataset:
     """
     Finds, downloads Sentinel-1, forest cover, water mask, snow coverage. Then retrieves snow depth
     using Lievens et al. 2021 method.
@@ -86,10 +86,10 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
     ds = merge_s1_subsets(dict_ds)
 
     # add water mask
-    ds = ims_water_mask(ds)
+    # ds = ims_water_mask(ds)
 
     # mask out outliers in incidence angle
-    ds = s1_incidence_angle_masking(ds)
+    # ds = s1_incidence_angle_masking(ds)
 
     ## Snow Index Steps
     print("Calculating snow index")
