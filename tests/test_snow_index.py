@@ -336,6 +336,7 @@ class TestSnowIndex(unittest.TestCase):
         backscatter = np.random.randn(10, 10, 3, 3)
         deltaGamma = np.random.randn(10, 10 , 3)
         times = [np.datetime64(t) for t in ['2020-01-01', '2020-01-07', '2020-01-14']]
+        ims = np.full((10, 10, 3), 4)
         x = np.linspace(0, 9, 10)
         y = np.linspace(10, 19, 10)
         lon, lat = np.meshgrid(x, y)
@@ -343,7 +344,8 @@ class TestSnowIndex(unittest.TestCase):
         test_ds = xr.Dataset(
             data_vars = dict(
                 s1 = (["x", "y", "time", "band"], backscatter),
-                deltaGamma = (["x", "y", "time"], deltaGamma)
+                deltaGamma = (["x", "y", "time"], deltaGamma),
+                ims = (["x", "y", "time"], ims)
             ),
 
             coords = dict(
@@ -356,7 +358,7 @@ class TestSnowIndex(unittest.TestCase):
         ds = calc_snow_index(test_ds)
 
         # first time slice should be all nans. There is no deltaGamma
-        assert ds['snow_index'].isel(time = 0).isnull().sum() == 100
+        assert ds['snow_index'].isel(time = 0).sum() == 0
         # second time slice should be all delta gamma of that time slice (no other previous)
         np.allclose(ds['snow_index'].isel(time = 1), ds['deltaGamma'].isel(time = 1))
         # last time slice should just be deltaGamma @ t = 1 + deltaGamma @ t = 2
@@ -367,6 +369,7 @@ class TestSnowIndex(unittest.TestCase):
 
         backscatter = np.random.randn(10, 10, 6, 3)
         deltaGamma = np.random.randn(10, 10 , 6)
+        ims = np.full((10, 10, 6), 4)
         times = [np.datetime64(t) for t in ['2020-01-01','2020-01-02', '2020-01-07','2020-01-08', '2020-01-14', '2020-01-15']]
         x = np.linspace(0, 9, 10)
         y = np.linspace(10, 19, 10)
@@ -375,7 +378,8 @@ class TestSnowIndex(unittest.TestCase):
         test_ds = xr.Dataset(
             data_vars = dict(
                 s1 = (["x", "y", "time", "band"], backscatter),
-                deltaGamma = (["x", "y", "time"], deltaGamma)
+                deltaGamma = (["x", "y", "time"], deltaGamma),
+                ims = (["x", "y", "time"], ims),
             ),
 
             coords = dict(
@@ -388,12 +392,47 @@ class TestSnowIndex(unittest.TestCase):
         ds = calc_snow_index(test_ds)
 
         # first time slice should be all nans. There is no deltaGamma
-        assert ds['snow_index'].isel(time = 0).isnull().sum() == 100
+        assert ds['snow_index'].isel(time = 0).sum() == 0
 
-        assert_allclose(ds['snow_index'].isel(time = 1), ds['deltaGamma'].isel(time = 1))
+        first_delta_gamma = ds['deltaGamma'].isel(time = 1).where(ds['deltaGamma'].isel(time = 1) > 0, 0)
+        assert_allclose(ds['snow_index'].isel(time = 1), first_delta_gamma)
 
         # should be snowindex at t==0 (0) * 6 + si @ t == 1 (which is deltaGamma @ t=1) * 5 / (6 + 5) + deltaGamma @ t = 2 
-        assert_allclose(ds['snow_index'].isel(time = 2), ds['snow_index'].isel(time = 1)*5/(6+5) + ds['deltaGamma'].isel(time = 2))
+        second_delta_gamma = first_delta_gamma*5/(6+5) + ds['deltaGamma'].isel(time = 2)
+        second_delta_gamma = second_delta_gamma.where(second_delta_gamma > 0, 0)
+        assert_allclose(ds['snow_index'].isel(time = 2), second_delta_gamma)
+
+        # check with ims = 2 @ some points
+
+        backscatter = np.random.randn(10, 10, 6, 3)
+        deltaGamma = np.random.randn(10, 10 , 6)
+        ims = np.full((10, 10, 6), 4)
+        times = [np.datetime64(t) for t in ['2020-01-01','2020-01-02', '2020-01-07','2020-01-08', '2020-01-14', '2020-01-15']]
+        x = np.linspace(0, 9, 10)
+        y = np.linspace(10, 19, 10)
+        lon, lat = np.meshgrid(x, y)
+
+        test_ds = xr.Dataset(
+            data_vars = dict(
+                s1 = (["x", "y", "time", "band"], backscatter),
+                deltaGamma = (["x", "y", "time"], deltaGamma),
+                ims = (["x", "y", "time"], ims),
+            ),
+
+            coords = dict(
+                lon = (["x", "y"], lon),
+                lat = (["x", "y"], lat),
+                band = ['VV', 'VH', 'inc'],
+                time = times,
+                relative_orbit = (["time"], [24, 1, 24, 1, 24, 1])))
+        
+        ds['ims'].loc[dict(time = '2020-01-02', x = 5, y = 5)] = 2
+        ds['deltaGamma'].loc[dict(time = '2020-01-01', x = 5, y = 5)] = 5
+        ds['deltaGamma'].loc[dict(time = '2020-01-02', x = 5, y = 5)] = 5
+        
+        ds = calc_snow_index(test_ds)
+
+        assert ds['snow_index'].sel(time = '2020-01-02', x = 5, y = 5) == 0
 
     def test_snow_index_to_depth(self):
 
