@@ -63,9 +63,9 @@ class TestSnowIndex(unittest.TestCase):
 
         ds1 = calc_delta_cross_ratio(ds, A = test_A)
 
-        assert_allclose(ds1['deltaCR'].isel(time = 1), real2_1_diff), "Differences don't match t2 - t1"
+        assert_allclose(ds1['deltaCR'].isel(time = 1), real2_1_diff)
         
-        assert_allclose(ds1['deltaCR'].isel(time = 2), real3_2_diff), "Differences don't match t3 - t2"
+        assert_allclose(ds1['deltaCR'].isel(time = 2), real3_2_diff)
     
     def test_delta_cr_errors(self):
         """

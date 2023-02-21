@@ -17,14 +17,14 @@ from tqdm import tqdm
 import hyp3_sdk as sdk
 from hyp3_sdk.exceptions import AuthenticationError
 
-from typing import Dict, Tuple, List
+from typing import Dict, Tuple, List, Union
 
 import sys
 from os.path import expanduser
 sys.path.append(expanduser('~/Documents/spicy-snow'))
 from spicy_snow.utils.download import url_download
 
-def s1_img_search(area: shapely.geometry.box, dates: Tuple[str]) -> pd.DataFrame:
+def s1_img_search(area: shapely.geometry.Polygon, dates: Tuple[str, str]) -> pd.DataFrame:
     """
     find dates and url of Sentinel-1 overpasses
 
@@ -38,7 +38,7 @@ def s1_img_search(area: shapely.geometry.box, dates: Tuple[str]) -> pd.DataFrame
     # Error Checking
     if len(dates) != 2:
         raise TypeError("Provide at start and end date in format (YYYY-MM-DD, YYYY_MM_DD)")
-    if type(area) != shapely.geometry.polygon.Polygon:
+    if type(area) != shapely.geometry.Polygon:
         raise TypeError("Geometry must be a shapely.geometry.box type")
     if type(dates[0]) != str:
         raise TypeError("Provide at start and end date in format (YYYY-MM-DD, YYYY_MM_DD)")
@@ -66,7 +66,7 @@ def s1_img_search(area: shapely.geometry.box, dates: Tuple[str]) -> pd.DataFrame
 
     return results
 
-def hyp3_pipeline(search_results: pd.DataFrame, job_name, existing_job_name = False) -> sdk.jobs.Batch:
+def hyp3_pipeline(search_results: pd.DataFrame, job_name, existing_job_name: Union[bool, str] = False) -> sdk.jobs.Batch:
     """
     Start and monitor Hyp3 pipeline for desired Sentinel-1 granules
     https://hyp3-docs.asf.alaska.edu/using/sdk_api/
@@ -151,7 +151,7 @@ def hyp3_pipeline(search_results: pd.DataFrame, job_name, existing_job_name = Fa
     # return only successful jobs
     return rtc_jobs.filter_jobs(succeeded = True)
 
-def download_hyp3(jobs: sdk.jobs.Batch, area: shapely.geometry.box, outdir: str, clean = True) -> Dict[str, xr.DataArray]:
+def download_hyp3(jobs: sdk.jobs.Batch, area: shapely.geometry.Polygon, outdir: str, clean = True) -> Dict[str, xr.DataArray]:
     """
     Download rtc Sentinel-1 images from Hyp3 pipeline.
     https://hyp3-docs.asf.alaska.edu/using/sdk_api/
