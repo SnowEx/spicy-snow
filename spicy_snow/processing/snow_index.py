@@ -222,39 +222,6 @@ def calc_snow_index(dataset: xr.Dataset, inplace: bool = False) -> Union[None, x
     """
     Calculate snow index for each time step from previous time steps' snow index
     weights, and current delta-gamma.
-    SI (i, t) = SI (i, t_previous) + delta-gamma (i, t)
-    with SI (i, t_previous) as:
-        SI (i, t_previous) = sum (t_pri - 5/11 days, t_pri + 5/11 days)(SI * weights) / sum(weights)
-    Args:
-    dataset: Xarray Dataset of sentinel images with delta-gamma
-    inplace: operate on dataset in place or return copy
-    Returns:
-    dataset: Xarray Dataset of sentinel images with snow-index added as band
-    """
-    # check inplace flag
-    if not inplace:
-        dataset = dataset.copy(deep=True)
-
-    # set all snow index to 0 to start
-    dataset['snow_index'] = xr.zeros_like(dataset['deltaGamma'])
-
-    # find repeat interval of dataset
-    repeat = find_repeat_interval(dataset)
-
-    # iterate through time steps
-    for ct in dataset.time.values:
-        # calculate previous snow index
-        prev_si = calc_prev_snow_index(dataset, ct, repeat)
-        # add deltaGamma to previous snow inded
-        dataset['snow_index'].loc[dict(time = ct)] = prev_si + dataset['deltaGamma'].sel(time = ct)
-    
-    if not inplace:
-        return dataset
-
-def calc_snow_index(dataset: xr.Dataset, inplace: bool = False) -> xr.Dataset:
-    """
-    Calculate snow index for each time step from previous time steps' snow index
-    weights, and current delta-gamma.
 
     SI (i, t) = SI (i, t_previous) + delta-gamma (i, t)
 
@@ -289,7 +256,7 @@ def calc_snow_index(dataset: xr.Dataset, inplace: bool = False) -> xr.Dataset:
         return dataset
 
 
-def calc_snow_index_to_snow_depth(dataset: xr.Dataset, C: float = 0.44, inplace: bool = False) -> xr.Dataset:
+def calc_snow_index_to_snow_depth(dataset: xr.Dataset, C: float = 0.44, inplace: bool = False) -> Union[None, xr.Dataset]:
     """
     Convert current snow-index to snow depth using the C parameter. Varied 
     from [0->1 by 0.01].
