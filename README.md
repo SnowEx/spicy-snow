@@ -56,7 +56,7 @@ pip install c_snow
 ## Example usage:
 
 ```python
-from spicy-snow import get_s1_snow_depth, bounding_box
+from spicy_snow.retrievals import retrieve_snow_depth, bounding_box
 import rioxarray as rxa
 
 # Provide bounding box (user popup or user-provided coordinates)
