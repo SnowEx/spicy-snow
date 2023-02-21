@@ -9,7 +9,8 @@ import sys
 from os.path import expanduser
 sys.path.append(expanduser('./'))
 from spicy_snow.processing.s1_preprocessing import s1_amp_to_dB, s1_dB_to_amp, \
-    merge_partial_s1_images, s1_clip_outliers, s1_orbit_averaging
+    merge_partial_s1_images, s1_clip_outliers, s1_orbit_averaging, subset_s1_images, \
+    merge_s1_subsets
 
 class TestSentinel1PreProcessing(unittest.TestCase):
     """
@@ -177,7 +178,68 @@ class TestSentinel1PreProcessing(unittest.TestCase):
 
         self.assertRaises(AssertionError, s1_orbit_averaging, ds)
 
+    x = np.linspace(0, 9, 10)
+    y = np.linspace(10, 19, 10)
+    lon, lat = np.meshgrid(x, y)
+    times = pd.date_range("2020-01-01", end = '2020-12-31', freq = '6D')
+    n = len(times)
+    data = np.random.randn(10,10, n)
+
+    ros = np.resize([1, 24], (n))
+    platforms = np.resize(['S1A', 'S1B', 'S1B', 'S1A'], (n))
+    direction = np.resize(['ascending', 'descending'], (n))
+
+    test_ds = xr.Dataset(data_vars= dict(
+        data = (["x", "y", "time"], data)
+            ),
+        coords = dict(
+                            lon = (["x", "y"], lon),
+                            lat = (["x", "y"], lat),
+                            time = times,
+                            relative_orbit = (["time"], ros),
+                            platform = (["time"], platforms),
+                            flight_dir = (["time"], direction)) 
+            
+        )
+
+    def test_subset_dataset(self, ds = test_ds):
         
+        dict_da = subset_s1_images(ds)
+        
+        v = dict_da['S1A-descending']['platform'] == 'S1A'
+        self.assertTrue(v.all())
+
+        v = dict_da['S1A-descending']['flight_dir'] == 'descending'
+        self.assertTrue(v.all())
+
+        v = dict_da['S1A-ascending']['platform'] == 'S1A'
+        self.assertTrue(v.all())
+
+        v = dict_da['S1A-ascending']['flight_dir'] == 'ascending'
+        self.assertTrue(v.all())
+
+        v = dict_da['S1B-ascending']['platform'] == 'S1B'
+        self.assertTrue(v.all())
+
+        v = dict_da['S1B-ascending']['flight_dir'] == 'ascending'
+        self.assertTrue(v.all())
+
+        v = dict_da['S1B-descending']['platform'] == 'S1B'
+        self.assertTrue(v.all())
+
+        v = dict_da['S1B-descending']['flight_dir'] == 'descending'
+        self.assertTrue(v.all())
+    
+    def test_merge_subsets(self, ds = test_ds):
+
+        dict_da = subset_s1_images(ds)
+
+        merged_ds = merge_s1_subsets(dict_da)
+
+        v = ds == merged_ds
+
+        self.assertTrue(v.all())
+
         
 if __name__ == '__main__':
     unittest.main()

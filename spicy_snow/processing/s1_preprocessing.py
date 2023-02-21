@@ -10,6 +10,7 @@ import pandas as pd
 import xarray as xr
 import rioxarray
 from rioxarray.merge import merge_arrays
+from itertools import product
 
 def s1_amp_to_dB(dataset: xr.Dataset, inplace: bool = False):
     """
@@ -85,7 +86,11 @@ def merge_s1_times(dataset: xr.Dataset, times: List[np.datetime64], verbose: boo
 
     if verbose:
         print('Merging:', times)
+
+    # make list of DataArrays at each time step in times
     das = [dataset.sel(time = ts)['s1'] for ts in times]
+
+    # check all images are same relative_orbit? 
     assert len(das) == len([d for d in das if d['relative_orbit'] == das[0]['relative_orbit']])
     if das[0].where(das[0] == 0).notnull().sum() > 0:
         nodata_value = 0
@@ -118,7 +123,7 @@ def merge_partial_s1_images(dataset: xr.Dataset) -> xr.Dataset:
             times.append(ts)
             continue
 
-        if ts - times[0] > pd.Timedelta('1 minute'):
+        if abs(ts - times[0]) > pd.Timedelta('1 minute'):
             if len(times) == 1:
                 times = [ts]
                 continue
@@ -147,18 +152,23 @@ def subset_s1_images(dataset: xr.Dataset) -> Dict[str, xr.Dataset]:
     ascending, descending, and 1A and 1B with keys {satellite}-{direction}.
     """
 
-    # might want to use this .set_xindex to speed up searching but would need to
-    # delete after function runs.
-    # ds = ds.set_xindex('relative_orbit')
-    # ds.sel(relative_orbit = 20)
-    # otherwise:
-    # ds.where(ds.flight_dir == 'ascending', drop = True)
+    # options for platform and direction
+    platforms, directions = ['S1A','S1B'], ['descending', 'ascending']
 
-    # Calculate unique orbits, ascending, satellites
+    # make subset dictionary
+    subset_ds = {}
 
-    # Add orbit, ascending vs. descending, satellite #
+    # loop through possible combinations
+    for platform, direction in product(platforms,directions):
 
-    # split Dataset by satellite and 
+        # subset on platform and direction
+        subset = dataset.sel(time = dataset.platform == platform)
+        subset = subset.sel(time = subset.flight_dir == direction)
+
+        # save subset to dictionary
+        subset_ds[f'{platform}-{direction}'] = subset
+    
+    return subset_ds
 
 def s1_orbit_averaging(dataset: xr.Dataset, inplace: bool = False) -> xr.Dataset:
     """
@@ -273,7 +283,7 @@ def s1_incidence_angle_masking(dataset: xr.Dataset) -> xr.Dataset:
 
     # mask pixels with incidence angle > 70 degrees
 
-def merge_s1_subsets(dataset: Dict[str, xr.Dataset]) -> xr.Dataset:
+def merge_s1_subsets(dataset_dictionary: Dict[str, xr.Dataset]) -> xr.Dataset:
     """
     Remove s1 image outliers by masking pixels with incidence angles > 70 degrees
 
@@ -286,4 +296,7 @@ def merge_s1_subsets(dataset: Dict[str, xr.Dataset]) -> xr.Dataset:
     """
 
     # merge subsets of orbit/satellite into one Dataset
+    dataset = xr.merge(dataset_dictionary.values())
+
+    return dataset
 

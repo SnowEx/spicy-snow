@@ -18,7 +18,7 @@ dates = ('2019-08-01', '2019-12-30')
 area = shapely.geometry.box(-115, 43, -114, 44)
 
 # Set skip = True to skip indented steps
-skip = False
+skip = True
 
 if not skip:
     os.makedirs('../data' , exist_ok = True)
@@ -38,21 +38,24 @@ if not skip:
     ds = download_snow_cover(ds, tmp_dir = '../data/tmp/', clean = False)
 
     # download fcf and add to dataset ['fcf'] keyword
-    fcf = download_fcf(ds, '../data/fcf.tif')
+    ds = download_fcf(ds, '../data/fcf.tif')
 
     # dump completed dataset to data directory
-
     with open('../data/main_test.pkl', 'wb') as f:
         pickle.dump(ds, f)
 
-    from spicy_snow.processing.s1_preprocessing import merge_partial_s1_images, s1_orbit_averaging,\
-    s1_clip_outliers
+import pickle
+with open('../data/main_test.pkl', 'rb') as f:
+        ds = pickle.load(f)
 
-    ds = merge_partial_s1_images(ds)
+from spicy_snow.processing.s1_preprocessing import merge_partial_s1_images, s1_orbit_averaging,\
+s1_clip_outliers
 
-    ds = s1_orbit_averaging(ds)
+ds = merge_partial_s1_images(ds)
 
-    ds = s1_clip_outliers(ds)
+ds = s1_orbit_averaging(ds)
+
+ds = s1_clip_outliers(ds)
 
 # import the function to test
 from spicy_snow.processing.snow_index import calc_delta_VV, calc_delta_cross_ratio, \
@@ -62,6 +65,7 @@ print('calculating CR')
 calc_delta_cross_ratio(ds, inplace = True)
 print('calculating delta VV')
 calc_delta_VV(ds, inplace = True)
+
 print('calculating delta gamma')
 calc_delta_gamma(ds, inplace = True)
 clip_delta_gamma_outlier(ds, inplace = True)
