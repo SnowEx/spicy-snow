@@ -1,16 +1,19 @@
 import unittest
+from unittest.mock import MagicMock
+from numpy.testing import assert_allclose
+import pandas.testing as pd_testing
+
+import numpy as np
+import xarray as xr
+import pandas as pd
+import pickle
 
 from shapely.geometry import box
-import pandas as pd
-import xarray
-import pickle
-import pandas.testing as pd_testing
 
 import sys
 from os.path import expanduser
 sys.path.append(expanduser('.'))
-from spicy_snow.download.sentinel1 import s1_img_search, download_s1_imgs
-from spicy_snow.download.forest_cover import download_fcf, add_fcf
+from spicy_snow.download.sentinel1 import s1_img_search, combine_s1_images
 
 class TestSentinel1Search(unittest.TestCase):
     """
@@ -69,12 +72,41 @@ class TestSentinel1Search(unittest.TestCase):
         self.assertRaises(IndexError, s1_img_search, box(-115, -46, -115.5, -46.5), dates)
         self.assertRaises(IndexError, s1_img_search, box(300000, 50000, 300000, 55000), dates)
 
-# class TestFCFDownload(unittest.TestCase):
-#     fcf = download_fcf('./tests/test_data/fcf.tif')
-#     print(os.get_cwd())
-    
-#     def test_fcf_return_type(self, fcf = fcf):
-#         self.assertEqual(type(fcf), xarray.DataArray)
-    
+    das = {}
+    granules = ['S1B_IW_GRDH_1SDV_20200201T013528_20200201T013553_020069_025FB3_6D5E',
+    'S1B_IW_GRDH_1SDV_20200130T134920_20200130T134948_020047_025EF4_9218',
+    'S1B_IW_GRDH_1SDV_20200127T012726_20200127T012751_019996_025D37_D0F0',
+    'S1A_IW_GRDH_1SDV_20200126T013605_20200126T013634_030965_038E37_760E',
+    'S1A_IW_GRDH_1SDV_20200124T135002_20200124T135027_030943_038D6F_FED5']
+    for i in range(5):
+        backscatter = np.random.randn(10, 10, 3)
+        x = np.linspace(0, 9, 10)
+        y = np.linspace(10, 19, 10)
+        lon, lat = np.meshgrid(x, y)
+
+        da = xr.DataArray(data = backscatter,
+            dims = ["x","y","band"],
+            coords = dict(
+                lon=(["x", "y"], lon),
+                lat=(["x", "y"], lat)))
+        das[granules[i]] = da
+
+    def test_combine_s1_imgs(self, das = das):
+        ds = combine_s1_images(das)
+
+        self.assertEqual(type(ds), xr.Dataset)
+
+        self.assertEqual(len(ds.time), 5)
+        self.assertEqual(len(ds.flight_dir), 5)
+        self.assertEqual(len(ds.platform), 5)
+        self.assertEqual(len(ds.relative_orbit), 5)
+
+        self.assertEqual(len(ds.band), 3)
+
+        self.assertEqual(ds.attrs['s1_units'], 'dB')
+        self.assertEqual(ds.attrs['resolution'], '30')
+
+        assert_allclose(das['S1B_IW_GRDH_1SDV_20200127T012726_20200127T012751_019996_025D37_D0F0'], ds.isel(time = 2)['s1'])
+
 if __name__ == '__main__':
     unittest.main()

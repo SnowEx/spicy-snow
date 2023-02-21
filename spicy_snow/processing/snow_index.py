@@ -128,6 +128,9 @@ def calc_delta_gamma(dataset: xr.Dataset, B: float = 0.5, inplace: bool = False)
     if not inplace:
         dataset = dataset.copy(deep=True)
 
+    # check to ensure fcf is 0-1 not 0-100
+    assert dataset['fcf'].max() <= 1, "Forest cover fraction must be scaled 0-1"
+
     # Calculate delta gamma from delta-gamma-cr, delta-gamma-VV and FCF
     # add delta-gamma as band to dataset
     dataset['deltaGamma'] = (1 - dataset['fcf']) * dataset['deltaCR'] + \
@@ -168,8 +171,10 @@ def find_repeat_interval(dataset: xr.Dataset) -> pd.Timedelta:
     """
     Figures out if datasets repeat interval is 6 days or 12 days. Should raise error
     if not multuple of 6 days.
+
     Args:
     dataset: dataset of sentinel-1 images
+
     Returns:
     repeat: pandas timedelta and number of days between images
     """
@@ -180,6 +185,7 @@ def find_repeat_interval(dataset: xr.Dataset) -> pd.Timedelta:
     assert repeat.days % 6 == 0, "Calculated repeat interval is not multiple of 6 days."
 
     return repeat
+
 
 def calc_prev_snow_index(dataset: xr.Dataset, current_time: np.datetime64, repeat: pd.Timedelta) -> xr.DataArray:
     """
@@ -245,8 +251,45 @@ def calc_snow_index(dataset: xr.Dataset, inplace: bool = False) -> Union[None, x
     if not inplace:
         return dataset
 
+def calc_snow_index(dataset: xr.Dataset, inplace: bool = False) -> xr.Dataset:
+    """
+    Calculate snow index for each time step from previous time steps' snow index
+    weights, and current delta-gamma.
 
-def calc_snow_index_to_snow_depth(dataset: xr.Dataset, C: float = 0.44, inplace: bool = False) -> Union[None, xr.Dataset]:
+    SI (i, t) = SI (i, t_previous) + delta-gamma (i, t)
+
+    with SI (i, t_previous) as:
+        SI (i, t_previous) = sum (t_pri - 5/11 days, t_pri + 5/11 days)(SI * weights) / sum(weights)
+
+    Args:
+    dataset: Xarray Dataset of sentinel images with delta-gamma
+    inplace: operate on dataset in place or return copy
+
+    Returns:
+    dataset: Xarray Dataset of sentinel images with snow-index added as band
+    """
+    # check inplace flag
+    if not inplace:
+        dataset = dataset.copy(deep=True)
+
+    # set all snow index to 0 to start
+    dataset['snow_index'] = xr.zeros_like(dataset['deltaGamma'])
+
+    # find repeat interval of dataset
+    repeat = find_repeat_interval(dataset)
+
+    # iterate through time steps
+    for ct in dataset.time.values:
+        # calculate previous snow index
+        prev_si = calc_prev_snow_index(dataset, ct, repeat)
+        # add deltaGamma to previous snow inded
+        dataset['snow_index'].loc[dict(time = ct)] = prev_si + dataset['deltaGamma'].sel(time = ct)
+    
+    if not inplace:
+        return dataset
+
+
+def calc_snow_index_to_snow_depth(dataset: xr.Dataset, C: float = 0.44, inplace: bool = False) -> xr.Dataset:
     """
     Convert current snow-index to snow depth using the C parameter. Varied 
     from [0->1 by 0.01].
@@ -254,6 +297,7 @@ def calc_snow_index_to_snow_depth(dataset: xr.Dataset, C: float = 0.44, inplace:
     dataset: Xarray Dataset of sentinel images with snow index
     C: fitting parameter
     inplace: operate on dataset in place or return copy
+
     Returns:
     dataset: Xarray Dataset of sentinel images with retrieved snow depth
     """
