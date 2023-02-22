@@ -282,8 +282,8 @@ def combine_s1_images(dataArrays: Dict[str, xr.DataArray]) -> xr.Dataset:
     # s1_units tag
     s1_dataset.attrs['s1_units'] = 'dB'
 
-    # resolution:
-    s1_dataset.attrs['resolution'] = '30'
+    # ensure time dimension is sorted
+    s1_dataset = s1_dataset.sortby('time')
 
     return s1_dataset
 
