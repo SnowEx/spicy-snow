@@ -259,7 +259,7 @@ def ims_water_mask(dataset: xr.Dataset) -> xr.Dataset:
 
     # mask all pixels in dataset where ims == 1 or 3.
 
-def s1_incidence_angle_masking(dataset: xr.Dataset) -> xr.Dataset:
+def s1_incidence_angle_masking(dataset: xr.Dataset, inplace: bool = False) -> xr.Dataset:
     """
     Remove s1 image outliers by masking pixels with incidence angles > 70 degrees
 
@@ -270,8 +270,22 @@ def s1_incidence_angle_masking(dataset: xr.Dataset) -> xr.Dataset:
     dataset: Xarray Dataset of sentinel images with incidence angles > 70 degrees
     masked
     """
+    
+    # Check inplace flag
+    if not inplace:
+            dataset = dataset.copy(deep=True)
 
-    # mask pixels with incidence angle > 70 degrees
+    # Mask pixels with incidence angle > 70 degrees
+    for band in ['inc']:
+            data = dataset['s1'].sel(band=band)
+
+            # Mask array ('inc' <= 0.7)
+            data_masked = data.where(data <= 0.7)
+
+            dataset['s1'].loc[dict(band = band)] = data_masked
+
+    if not inplace:
+            return dataset
 
 def merge_s1_subsets(dataset: Dict[str, xr.Dataset]) -> xr.Dataset:
     """
