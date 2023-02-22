@@ -19,7 +19,7 @@ Lievens et al 2021 - https://tc.copernicus.org/articles/16/159/2022/
 
 - [x] Design planning
 - [x] Pseudo-code
-- [ ] Logging system
+- [x] Logging system
 
 - [ ] User Inputs: 
     - [ ] dates 
