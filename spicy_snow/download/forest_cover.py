@@ -13,7 +13,7 @@ import xarray as xr
 sys.path.append(expanduser('~/Documents/spicy-snow'))
 from spicy_snow.utils.download import url_download
 
-def download_fcf(dataset: xr.Dataset, out_fp: str) -> xr.DataArray:
+def download_fcf(dataset: xr.Dataset, out_fp: str) -> xr.Dataset:
     """
     Download PROBA-V forest-cover-fraction images.
 
@@ -43,6 +43,7 @@ def download_fcf(dataset: xr.Dataset, out_fp: str) -> xr.DataArray:
     
     assert fcf.max() <= 1, "Forest cover fraction must be bounded 0-1"
     assert fcf.min() >= 0, "Forest cover fraction must be bounded 0-1"
+    
     # merge FCF and name it 'fcf' as a data variable
     dataset = xr.merge([dataset, fcf.rename('fcf')])
 

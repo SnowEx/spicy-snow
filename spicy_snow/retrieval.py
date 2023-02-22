@@ -57,7 +57,6 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
     print(f'Found {len(search_results)} results')
 
     # download s1 images into dataset ['s1'] keyword
-    # existing_job_name = 'spicy-snow-run'
     jobs = hyp3_pipeline(search_results, job_name = job_name, existing_job_name = existing_job_name)
     imgs = download_hyp3(jobs, area, outdir = join(work_dir, 'tmp'), clean = False)
     ds = combine_s1_images(imgs)

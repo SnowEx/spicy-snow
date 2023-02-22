@@ -23,6 +23,7 @@ import sys
 from os.path import expanduser
 sys.path.append(expanduser('~/Documents/spicy-snow'))
 from spicy_snow.utils.download import url_download
+from spicy_snow.processing.s1_preprocessing import s1_power_to_dB
 
 def s1_img_search(area: shapely.geometry.Polygon, dates: Tuple[str, str]) -> pd.DataFrame:
     """
@@ -132,7 +133,7 @@ def hyp3_pipeline(search_results: pd.DataFrame, job_name, existing_job_name: Uni
         # submit rtc jobs and ask for incidence angle map, in dBs, @ 30 m resolution
         # https://hyp3-docs.asf.alaska.edu/using/sdk_api/#hyp3_sdk.hyp3.HyP3.submit_rtc_job
         rtc_jobs += hyp3.submit_rtc_job(g, name = job_name, include_inc_map = True,\
-            scale = 'decibel', dem_matching = False, resolution = 30)
+            scale = 'power', dem_matching = False, resolution = 30)
 
     # warn user this may take a few hours for big jobs
     print(f'Watching {len(rtc_jobs)} jobs. This may take a while...')
@@ -279,11 +280,18 @@ def combine_s1_images(dataArrays: Dict[str, xr.DataArray]) -> xr.Dataset:
     # make sentinel 1 dataset 
     s1_dataset = s1_dataArray.to_dataset(name = 's1', promote_attrs = True)
 
-    # s1_units tag
-    s1_dataset.attrs['s1_units'] = 'dB'
+    # resolution set to 90m:
+    # must do in linear space not logarithmic dBs
+    assert s1_dataset['s1'].sel(band = ['VV', 'VH']).min() >= 0
+    s1_dataset = s1_dataset.coarsen(x = 3, boundary = 'trim').mean().coarsen(y = 3, boundary = 'trim').mean()
+    s1_dataset.attrs['resolution'] = '90'
 
     # ensure time dimension is sorted
     s1_dataset = s1_dataset.sortby('time')
+    
+    # s1_units tag
+    s1_dataset = s1_power_to_dB(s1_dataset)
+    s1_dataset.attrs['s1_units'] = 'dB'
 
     return s1_dataset
 
