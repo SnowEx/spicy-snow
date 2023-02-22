@@ -12,6 +12,9 @@ import rioxarray
 from rioxarray.merge import merge_arrays
 from itertools import product
 
+import logging
+log = logging.getLogger(__name__)
+
 def s1_power_to_dB(dataset: xr.Dataset, inplace: bool = False):
     """
     Convert s1 images from amplitude to dB
@@ -29,7 +32,7 @@ def s1_power_to_dB(dataset: xr.Dataset, inplace: bool = False):
     # check for dB
     if 's1_units' in dataset.attrs.keys():
         if dataset.attrs['s1_units'] == 'dB' and not inplace:
-            print("Sentinel 1 units already in dB.")
+            log.info("Sentinel 1 units already in dB.")
             return dataset
         if dataset.attrs['s1_units'] == 'dB':
             return
@@ -85,14 +88,13 @@ def merge_s1_times(dataset: xr.Dataset, times: List[np.datetime64], verbose: boo
     Xarray dataset: Xarray Dataset with sentinel-1 images with times combined into one
     """
 
-    if verbose:
-        print('Merging:', times)
-
     # make list of DataArrays at each time step in times
     das = [dataset.sel(time = ts)['s1'] for ts in times]
 
     # check all images are same relative_orbit? 
-    assert len(das) == len([d for d in das if d['relative_orbit'] == das[0]['relative_orbit']])
+    assert len(das) == len([d for d in das if d['relative_orbit'] == das[0]['relative_orbit']]), \
+        "All images not of same relative orbit."
+    
     if das[0].where(das[0] == 0).notnull().sum() > 0:
         nodata_value = 0
     else:
@@ -137,7 +139,7 @@ def merge_partial_s1_images(dataset: xr.Dataset) -> xr.Dataset:
         if ts == dataset.time.values[-1] and len(times) > 1:
             dataset = merge_s1_times(dataset, times)
             times = []
-        
+    
     return dataset
 
 def subset_s1_images(dataset: xr.Dataset) -> Dict[str, xr.Dataset]:
@@ -168,6 +170,7 @@ def subset_s1_images(dataset: xr.Dataset) -> Dict[str, xr.Dataset]:
 
         # save subset to dictionary
         subset_ds[f'{platform}-{direction}'] = subset
+        log.debug(f"{platform}-{direction}: length = {len(subset_ds[f'{platform}-{direction}'])}")
     
     return subset_ds
 
@@ -183,6 +186,7 @@ def s1_orbit_averaging(dataset: xr.Dataset, inplace: bool = False) -> xr.Dataset
     Returns:
     dataset: Xarray Dataset of sentinel images with all s1 images normalized to total mean
     """
+
     # check inplace flag
     if not inplace:
         dataset = dataset.copy(deep=True)
@@ -199,10 +203,13 @@ def s1_orbit_averaging(dataset: xr.Dataset, inplace: bool = False) -> xr.Dataset
         
         # calculate the overall (all orbits) mean
         overall_mean  = dataset['s1'].mean(dim = ['x','y','time']).sel(band = band)
+        log.debug(f"dataset's mean: {overall_mean}")
+
         for orbit in orbits:
             
             # calculate each orbit's mean value
             orbit_mean = dataset['s1'].sel(time = dataset.relative_orbit == orbit, band = band).mean(dim = ['x','y','time'])
+            log.debug(f"Orbit's {orbit} pre-mean: {overall_mean}")
 
             # rescale each image by the mean correction (orbit mean -> overall mean)
             dataset['s1'].loc[dict(time = dataset.relative_orbit == orbit, band = band)] = \
@@ -211,7 +218,7 @@ def s1_orbit_averaging(dataset: xr.Dataset, inplace: bool = False) -> xr.Dataset
     if not inplace:
         return dataset
 
-def s1_clip_outliers(dataset: xr.Dataset, inplace: bool = False, verbose: bool = False) -> xr.Dataset:
+def s1_clip_outliers(dataset: xr.Dataset, inplace: bool = False) -> xr.Dataset:
     """
     Remove s1 image outliers by masking pixels 3 dB above 90th percentile or
     3 dB before the 10th percentile. (-35 -> 15 dB for VV) and (-40 -> 10 for VH
@@ -220,7 +227,6 @@ def s1_clip_outliers(dataset: xr.Dataset, inplace: bool = False, verbose: bool =
     Args:
     dataset: Xarray Dataset of sentinel images to clip outliers
     inplace: boolean flag to modify original Dataset or return a new Dataset
-    verbose: flag to print out masking stats
 
     Returns:
     dataset: Xarray Dataset of sentinel images with masked outliers
@@ -243,16 +249,15 @@ def s1_clip_outliers(dataset: xr.Dataset, inplace: bool = False, verbose: bool =
         # Mask using percentile thresholds
         data_masked = data.where((data > thresh_lo) & (data < thresh_hi))
 
-        if verbose:
-            print(f'Clipping band: {band}')
-            print(f'Thresh min: {thresh_lo.values}. Thresh max: {thresh_hi.values}')
-            pre_min, pre_max = data.min().values, data.max().values
-            print(f'Data min: {pre_min}. Data max: {pre_max}')
-            min, max = data_masked.min().values, data_masked.max().values
-            print(f'Masked data min: {min}. Data max: {max}')
+
+        log.debug(f'Clipping band: {band}')
+        log.debug(f'Thresh min: {thresh_lo.values}. Thresh max: {thresh_hi.values}')
+        pre_min, pre_max = data.min().values, data.max().values
+        log.debug(f'Data min: {pre_min}. Data max: {pre_max}')
+        min, max = data_masked.min().values, data_masked.max().values
+        log.debug(f'Masked data min: {min}. Data max: {max}')
 
         dataset['s1'].loc[dict(band = band)] = data_masked
-
 
     if not inplace:
         return dataset
@@ -295,7 +300,6 @@ def merge_s1_subsets(dataset_dictionary: Dict[str, xr.Dataset]) -> xr.Dataset:
     Returns:
     dataset: Xarray Dataset of all preprocessed sentinel images
     """
-
     # merge subsets of orbit/satellite into one Dataset
     dataset = xr.merge(dataset_dictionary.values())
 

@@ -19,6 +19,8 @@ import pandas as pd
 import xarray as xr
 import rioxarray as rxa
 
+import logging
+log = logging.getLogger(__name__)
 
 sys.path.append(expanduser('~/Documents/spicy-snow'))
 from spicy_snow.utils.download import url_download, decompress
@@ -36,8 +38,15 @@ def get_ims_day_data(year: str, doy: str, tmp_dir: str) -> xr.DataArray:
     cd = os.getcwd()
     os.makedirs(tmp_dir, exist_ok = True)
     os.chdir(tmp_dir)
-    # download IMS data for this day and year
-    local_fp, _ = urllib.request.urlretrieve(f'ftp://sidads.colorado.edu/pub/DATASETS/NOAA/G02156/netcdf/1km/{year}/ims{year}{doy}_1km_v1.3.nc.gz', f'ims{year}{doy}_1km_v1.3.nc.gz')
+
+    # if we haven't found a file that works add one more to day and try again
+    local_fp = None
+    while not local_fp:
+        try:
+            # download IMS data for this day and year
+            local_fp, _ = urllib.request.urlretrieve(f'ftp://sidads.colorado.edu/pub/DATASETS/NOAA/G02156/netcdf/1km/{year}/ims{year}{doy}_1km_v1.3.nc.gz', f'ims{year}{doy}_1km_v1.3.nc.gz')
+        except:
+            doy = f'{int(doy) + 1:03}'
     # decompress .gz compression
     out_file = decompress(local_fp, local_fp.replace('.gz',''))
     # open as xarray dataArray
