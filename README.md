@@ -59,7 +59,6 @@ pip install c_snow
 from spicy_snow.retrievals import retrieve_snow_depth
 
 import shapely
-import rioxarray as rxa
 
 # Provide bounding box (EPSG:4326 user-provided coordinates)
 area = shapely.geometry.box(-115, 43, -114, 44)
