@@ -63,27 +63,27 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
     ## Downloading Steps
 
     # get asf_search search results
-    search_results = s1_img_search(area, dates)
-    log.info(f'Found {len(search_results)} results')
+    # search_results = s1_img_search(area, dates)
+    # log.info(f'Found {len(search_results)} results')
 
-    # download s1 images into dataset ['s1'] keyword
-    jobs = hyp3_pipeline(search_results, job_name = job_name, existing_job_name = existing_job_name)
-    imgs = download_hyp3(jobs, area, outdir = join(work_dir, 'tmp'), clean = False)
-    ds = combine_s1_images(imgs)
+    # # download s1 images into dataset ['s1'] keyword
+    # jobs = hyp3_pipeline(search_results, job_name = job_name, existing_job_name = existing_job_name)
+    # imgs = download_hyp3(jobs, area, outdir = join(work_dir, 'tmp'), clean = False)
+    # ds = combine_s1_images(imgs)
 
-    # merge partial images together
-    ds = merge_partial_s1_images(ds)
+    # # merge partial images together
+    # ds = merge_partial_s1_images(ds)
+
+    # # download IMS snow cover and add to dataset ['ims'] keyword
+    # ds = download_snow_cover(ds, tmp_dir = join(work_dir, 'tmp'), clean = False)
+
+    # # download fcf and add to dataset ['fcf'] keyword
+    # ds = download_fcf(ds, join(work_dir, 'tmp', 'fcf.tif'))
 
     # ## DELETE
-    # import pickle
-    # with open('/Users/zachkeskinen/Documents/spicy-snow/data/lidar_tmp.pkl', 'rb') as f:
-    #     ds = pickle.load(f)
-
-    # download IMS snow cover and add to dataset ['ims'] keyword
-    ds = download_snow_cover(ds, tmp_dir = join(work_dir, 'tmp'), clean = False)
-
-    # download fcf and add to dataset ['fcf'] keyword
-    ds = download_fcf(ds, join(work_dir, 'tmp', 'fcf.tif'))
+    import pickle
+    with open('/Users/zachkeskinen/Documents/spicy-snow/data/lidar_tmp.pkl', 'rb') as f:
+        ds = pickle.load(f)
 
     ## Preprocessing Steps
     log.info("Preprocessing Sentinel-1 images")
