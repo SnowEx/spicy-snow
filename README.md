@@ -32,20 +32,20 @@ Lievens et al 2021 - https://tc.copernicus.org/articles/16/159/2022/
     - [ ] Glacier cover from Randolph Glacier Inventory 6.0
     - [x] Forest Cover Fraction from copernicus PROBA-V dataset
 
-- [ ] Processing steps
+- [x] Processing steps
     - [x] Rescale by mean for all orbits to overall mean
     - [x] Remove observations 3dB above 90th percentile or 3dB below 10th percentile
     - [x] Calculate \triangle \gamma_{CR} and \triangle \gamma_{VV}
     - [x] Calculate combined values \gamma
     - [x] Calculate previous SI using weighted +- 5/11 days SI
-    - [ ] Calculate SI and SD, uses snow cover from IMS too
-    - [ ] Wet snow mask update based on -2dB or +2dB changes
-    - [ ] Coarsen to appropriate resolution
+    - [x] Calculate SI and SD, uses snow cover from IMS too
+    - [x] Wet snow mask update based on -2dB or +2dB changes, negative SI
+    - [x] Coarsen to appropriate resolution
 
 - [ ] Output: 
     - [ ] xarray netcdf of snow depths
     
-- [ ] Tests
+- [x] Tests
 
 ## Example Installation
 
@@ -56,25 +56,29 @@ pip install c_snow
 ## Example usage:
 
 ```python
-from spicy-snow import get_s1_snow_depth, bounding_box
-import rioxarray as rxa
+from spicy_snow.retrievals import retrieve_snow_depth
 
-# Provide bounding box (user popup or user-provided coordinates)
-area = bounding_box() # pop up for user to draw
-area = bounding_box(lower_left, upper_left, upper_right, lower_right) # or provide coordinates
+import shapely
 
-# Provide output filename for netcdf
-output_netcdf = '/filepath/to/output.netcdf' # should this overwrite file?
+# Provide bounding box (EPSG:4326 user-provided coordinates)
+area = shapely.geometry.box(-115, 43, -114, 44)
 
-# Provide dates as tuple of strings
-dates = ("2019-12-01", "2020-04-01")
+# Provide dates as tuple of strings. First date should always be August 1st
+dates = ("2019-08-01", "2020-04-01")
 
 # Function to actually get data, run processing, returns xarray dataset w/ daily time dimension
-s1_sd = get_s1_snow_depth(area, dates, output_netcdf) 
-# optional keyword ideas: resolution, overwrite, fitting parameters (A, B, C)
+s1_sd = get_s1_snow_depth(area, dates, work_dir = './idaho_retrieval/) 
+
+# work_dir will be created if not present 
+# optional keyword ideas: job_name, fitting parameters (A, B, C), exisiting_job_name
 
 # plot first day of 2020 to check data quality
 s1_sd.sel(time = "2020-01-01").plot()
+
+# save as pickle file
+# dump completed dataset to data directory
+with open('./idaho_retrieval/spicy_test.pkl', 'wb') as f:
+    pickle.dump(ds, f)
 ```
 
 ## Proposed Directory Structure:

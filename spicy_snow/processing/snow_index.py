@@ -130,6 +130,7 @@ def calc_delta_gamma(dataset: xr.Dataset, B: float = 0.5, inplace: bool = False)
 
     # check to ensure fcf is 0-1 not 0-100
     assert dataset['fcf'].max() <= 1, "Forest cover fraction must be scaled 0-1"
+    assert dataset['fcf'].min() >= 0, "Forest cover fraction must be scaled 0-1"
 
     # Calculate delta gamma from delta-gamma-cr, delta-gamma-VV and FCF
     # add delta-gamma as band to dataset
@@ -143,7 +144,9 @@ def calc_delta_gamma(dataset: xr.Dataset, B: float = 0.5, inplace: bool = False)
     if not inplace:
         return dataset
 
+
 def clip_delta_gamma_outlier(dataset: xr.Dataset, thresh: float = 3, inplace: bool = False) -> Union[None, xr.Dataset]:
+
     """
     Clip delta gamma to -3 -> 3 dB
 
@@ -249,8 +252,15 @@ def calc_snow_index(dataset: xr.Dataset, inplace: bool = False) -> Union[None, x
     for ct in dataset.time.values:
         # calculate previous snow index
         prev_si = calc_prev_snow_index(dataset, ct, repeat)
+        
         # add deltaGamma to previous snow inded
         dataset['snow_index'].loc[dict(time = ct)] = prev_si + dataset['deltaGamma'].sel(time = ct)
+        
+        # change to 0 when ims snow cover is not 4
+        dataset['snow_index'].loc[dict(time = ct)] = dataset['snow_index'].sel(time = ct).where(dataset['ims'].sel(time = ct) == 4, 0)
+
+        # change to 0 when snow_index is negative and change nans to 0
+        dataset['snow_index'].loc[dict(time = ct)] = dataset['snow_index'].sel(time = ct).where(dataset['snow_index'].sel(time = ct) > 0, 0)
     
     if not inplace:
         return dataset

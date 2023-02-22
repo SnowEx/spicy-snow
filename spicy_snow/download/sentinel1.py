@@ -17,14 +17,15 @@ from tqdm import tqdm
 import hyp3_sdk as sdk
 from hyp3_sdk.exceptions import AuthenticationError
 
-from typing import Dict, Tuple, List
+from typing import Dict, Tuple, List, Union
 
 import sys
 from os.path import expanduser
 sys.path.append(expanduser('~/Documents/spicy-snow'))
 from spicy_snow.utils.download import url_download
+from spicy_snow.processing.s1_preprocessing import s1_power_to_dB
 
-def s1_img_search(area: shapely.geometry.box, dates: Tuple[str]) -> pd.DataFrame:
+def s1_img_search(area: shapely.geometry.Polygon, dates: Tuple[str, str]) -> pd.DataFrame:
     """
     find dates and url of Sentinel-1 overpasses
 
@@ -38,7 +39,7 @@ def s1_img_search(area: shapely.geometry.box, dates: Tuple[str]) -> pd.DataFrame
     # Error Checking
     if len(dates) != 2:
         raise TypeError("Provide at start and end date in format (YYYY-MM-DD, YYYY_MM_DD)")
-    if type(area) != shapely.geometry.polygon.Polygon:
+    if type(area) != shapely.geometry.Polygon:
         raise TypeError("Geometry must be a shapely.geometry.box type")
     if type(dates[0]) != str:
         raise TypeError("Provide at start and end date in format (YYYY-MM-DD, YYYY_MM_DD)")
@@ -66,7 +67,7 @@ def s1_img_search(area: shapely.geometry.box, dates: Tuple[str]) -> pd.DataFrame
 
     return results
 
-def hyp3_pipeline(search_results: pd.DataFrame, job_name, existing_job_name = False) -> sdk.jobs.Batch:
+def hyp3_pipeline(search_results: pd.DataFrame, job_name, existing_job_name: Union[bool, str] = False) -> sdk.jobs.Batch:
     """
     Start and monitor Hyp3 pipeline for desired Sentinel-1 granules
     https://hyp3-docs.asf.alaska.edu/using/sdk_api/
@@ -132,7 +133,7 @@ def hyp3_pipeline(search_results: pd.DataFrame, job_name, existing_job_name = Fa
         # submit rtc jobs and ask for incidence angle map, in dBs, @ 30 m resolution
         # https://hyp3-docs.asf.alaska.edu/using/sdk_api/#hyp3_sdk.hyp3.HyP3.submit_rtc_job
         rtc_jobs += hyp3.submit_rtc_job(g, name = job_name, include_inc_map = True,\
-            scale = 'decibel', dem_matching = False, resolution = 30)
+            scale = 'power', dem_matching = False, resolution = 30)
 
     # warn user this may take a few hours for big jobs
     print(f'Watching {len(rtc_jobs)} jobs. This may take a while...')
@@ -151,7 +152,7 @@ def hyp3_pipeline(search_results: pd.DataFrame, job_name, existing_job_name = Fa
     # return only successful jobs
     return rtc_jobs.filter_jobs(succeeded = True)
 
-def download_hyp3(jobs: sdk.jobs.Batch, area: shapely.geometry.box, outdir: str, clean = True) -> Dict[str, xr.DataArray]:
+def download_hyp3(jobs: sdk.jobs.Batch, area: shapely.geometry.Polygon, outdir: str, clean = True) -> Dict[str, xr.DataArray]:
     """
     Download rtc Sentinel-1 images from Hyp3 pipeline.
     https://hyp3-docs.asf.alaska.edu/using/sdk_api/
@@ -279,11 +280,18 @@ def combine_s1_images(dataArrays: Dict[str, xr.DataArray]) -> xr.Dataset:
     # make sentinel 1 dataset 
     s1_dataset = s1_dataArray.to_dataset(name = 's1', promote_attrs = True)
 
-    # s1_units tag
-    s1_dataset.attrs['s1_units'] = 'dB'
+    # resolution set to 90m:
+    # must do in linear space not logarithmic dBs
+    assert s1_dataset['s1'].sel(band = ['VV', 'VH']).min() >= 0
+    s1_dataset = s1_dataset.coarsen(x = 3, boundary = 'trim').mean().coarsen(y = 3, boundary = 'trim').mean()
+    s1_dataset.attrs['resolution'] = '90'
 
-    # resolution:
-    s1_dataset.attrs['resolution'] = '30'
+    # ensure time dimension is sorted
+    s1_dataset = s1_dataset.sortby('time')
+    
+    # s1_units tag
+    s1_dataset = s1_power_to_dB(s1_dataset)
+    s1_dataset.attrs['s1_units'] = 'dB'
 
     return s1_dataset
 
