@@ -84,7 +84,7 @@ def download_snow_cover(dataset: xr.Dataset, tmp_dir: str = './tmp', clean: bool
     full_ims = xr.concat(all_ims, dim = 'time')
 
     # add dataArray of IMS to the sentinel-1 dataset with timestamp information
-    dataset = xr.merge([dataset, ims.rename('ims')])
+    dataset = xr.merge([dataset, full_ims.rename('ims')])
     
     # remove data directory of downloaded IMS tifs
     if clean == True:
