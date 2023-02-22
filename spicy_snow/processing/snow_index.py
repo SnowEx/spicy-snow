@@ -6,7 +6,9 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-def calc_delta_VV(dataset: xr.Dataset, inplace: bool = False) -> xr.Dataset:
+from typing import Union
+
+def calc_delta_VV(dataset: xr.Dataset, inplace: bool = False) -> Union[None, xr.Dataset]:
     """
     Calculate change in VV amplitude between current time step and previous
     from each relative orbit and adds to dataset.
@@ -51,7 +53,7 @@ def calc_delta_VV(dataset: xr.Dataset, inplace: bool = False) -> xr.Dataset:
     if not inplace:
         return dataset
 
-def calc_delta_cross_ratio(dataset: xr.Dataset, A: float = 2, inplace: bool = False) -> xr.Dataset:
+def calc_delta_cross_ratio(dataset: xr.Dataset, A: float = 2, inplace: bool = False) -> Union[None, xr.Dataset]:
     """
     Calculate change in cross-polarization ratio for all time steps.
     
@@ -108,7 +110,7 @@ def calc_delta_cross_ratio(dataset: xr.Dataset, A: float = 2, inplace: bool = Fa
     if not inplace:
         return dataset
 
-def calc_delta_gamma(dataset: xr.Dataset, B: float = 0.5, inplace: bool = False) -> xr.Dataset:
+def calc_delta_gamma(dataset: xr.Dataset, B: float = 0.5, inplace: bool = False) -> Union[None, xr.Dataset]:
     """
     Calculate change in combined gamma parameter (VV and cross-ratio) between 
     current time step and previous.
@@ -141,7 +143,7 @@ def calc_delta_gamma(dataset: xr.Dataset, B: float = 0.5, inplace: bool = False)
     if not inplace:
         return dataset
 
-def clip_delta_gamma_outlier(dataset: xr.Dataset, thresh: float = 3, inplace: bool = False) -> xr.Dataset: 
+def clip_delta_gamma_outlier(dataset: xr.Dataset, thresh: float = 3, inplace: bool = False) -> Union[None, xr.Dataset]: 
     """
     Clip delta gamma to -3 -> 3 dB
 
@@ -219,7 +221,7 @@ def calc_prev_snow_index(dataset: xr.Dataset, current_time: np.datetime64, repea
 
     return prev_si
 
-def calc_snow_index(dataset: xr.Dataset, inplace: bool = False) -> xr.Dataset:
+def calc_snow_index(dataset: xr.Dataset, inplace: bool = False) -> Union[None, xr.Dataset]:
     """
     Calculate snow index for each time step from previous time steps' snow index
     weights, and current delta-gamma.
@@ -250,14 +252,21 @@ def calc_snow_index(dataset: xr.Dataset, inplace: bool = False) -> xr.Dataset:
     for ct in dataset.time.values:
         # calculate previous snow index
         prev_si = calc_prev_snow_index(dataset, ct, repeat)
+        
         # add deltaGamma to previous snow inded
         dataset['snow_index'].loc[dict(time = ct)] = prev_si + dataset['deltaGamma'].sel(time = ct)
+        
+        # change to 0 when ims snow cover is not 4
+        dataset['snow_index'].loc[dict(time = ct)] = dataset['snow_index'].sel(time = ct).where(dataset['ims'].sel(time = ct) == 4, 0)
+
+        # change to 0 when snow_index is negative and change nans to 0
+        dataset['snow_index'].loc[dict(time = ct)] = dataset['snow_index'].sel(time = ct).where(dataset['snow_index'].sel(time = ct) > 0, 0)
     
     if not inplace:
         return dataset
 
 
-def calc_snow_index_to_snow_depth(dataset: xr.Dataset, C: float = 0.44, inplace: bool = False) -> xr.Dataset:
+def calc_snow_index_to_snow_depth(dataset: xr.Dataset, C: float = 0.44, inplace: bool = False) -> Union[None, xr.Dataset]:
     """
     Convert current snow-index to snow depth using the C parameter. Varied 
     from [0->1 by 0.01].
