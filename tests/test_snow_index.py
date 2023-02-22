@@ -426,9 +426,9 @@ class TestSnowIndex(unittest.TestCase):
                 time = times,
                 relative_orbit = (["time"], [24, 1, 24, 1, 24, 1])))
         
-        ds['ims'].loc[dict(time = '2020-01-02', x = 5, y = 5)] = 2
-        ds['deltaGamma'].loc[dict(time = '2020-01-01', x = 5, y = 5)] = 5
-        ds['deltaGamma'].loc[dict(time = '2020-01-02', x = 5, y = 5)] = 5
+        test_ds['ims'].loc[dict(time = '2020-01-02', x = 5, y = 5)] = 2
+        test_ds['deltaGamma'].loc[dict(time = '2020-01-01', x = 5, y = 5)] = 5
+        test_ds['deltaGamma'].loc[dict(time = '2020-01-02', x = 5, y = 5)] = 5
         
         ds = calc_snow_index(test_ds)
 
