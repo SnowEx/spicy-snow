@@ -8,6 +8,9 @@ import xarray as xr
 
 from typing import Union
 
+import logging
+log = logging.getLogger(__name__)
+
 def calc_delta_VV(dataset: xr.Dataset, inplace: bool = False) -> Union[None, xr.Dataset]:
     """
     Calculate change in VV amplitude between current time step and previous
@@ -149,6 +152,7 @@ def clip_delta_gamma_outlier(dataset: xr.Dataset, thresh: float = 3, inplace: bo
 
     Args:
     dataset: Xarray Dataset of sentinel images with delta-gamma
+    thresh: threshold in dB to clip delta Gamma to
 
     Returns:
     dataset: Xarray Dataset of sentinel images with delta gamma changes clipped

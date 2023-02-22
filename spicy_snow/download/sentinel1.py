@@ -25,6 +25,9 @@ sys.path.append(expanduser('~/Documents/spicy-snow'))
 from spicy_snow.utils.download import url_download
 from spicy_snow.processing.s1_preprocessing import s1_power_to_dB
 
+import logging
+log = logging.getLogger(__name__)
+
 def s1_img_search(area: shapely.geometry.Polygon, dates: Tuple[str, str]) -> pd.DataFrame:
     """
     find dates and url of Sentinel-1 overpasses
@@ -57,7 +60,7 @@ def s1_img_search(area: shapely.geometry.Polygon, dates: Tuple[str, str]) -> pd.
     # get results from asf_search in date range and geometry
     results = asf.geo_search(platform = [asf.PLATFORM.SENTINEL1], intersectsWith = area.wkt,\
         start = dates[0], end = dates[1], processingLevel = asf.PRODUCT_TYPE.GRD_HD)
-
+    
     # check with 0 results.
     if len(results) == 0:
         raise ValueError("No search results found.")
@@ -89,9 +92,12 @@ def hyp3_pipeline(search_results: pd.DataFrame, job_name, existing_job_name: Uni
 
     # if existing job name provided then don't submit and simply watch existing jobs.
     while existing_job_name:
+        log.debug(f"existing name provided {existing_job_name}.")
         rtc_jobs = hyp3.find_jobs(name = existing_job_name)
         rtc_jobs = rtc_jobs.filter_jobs(succeeded = True, failed = False, \
             running = True, include_expired = False)
+        log.debug(f"Found {len(rtc_jobs)} jobs under existing name. \
+                  This is only succeeded and running jobs.")
 
         # if no jobs found go to original search with name.
         if len(rtc_jobs) == 0:
@@ -99,6 +105,7 @@ def hyp3_pipeline(search_results: pd.DataFrame, job_name, existing_job_name: Uni
 
         # if no running jobs then just return succeeded jobs
         if len(rtc_jobs.filter_jobs(succeeded = False, failed = False)) == 0:
+            log.debug("No running jobs. Returning succeeded.")
             return rtc_jobs.filter_jobs(succeeded = True)
 
         # otherwise watch running jobs
@@ -107,13 +114,14 @@ def hyp3_pipeline(search_results: pd.DataFrame, job_name, existing_job_name: Uni
         # refresh with new successes and failures
         rtc_jobs = hyp3.refresh(rtc_jobs)
         
+        log.debug(f"Successful jobs returned after watching {len(rtc_jobs.filter_jobs(succeeded = True))}")
         # return successful jobs
         return rtc_jobs.filter_jobs(succeeded = True)
     
     # check if you have passed quota
     quota = hyp3.check_quota()
     if not quota or len(search_results) > hyp3.check_quota():
-        print(f'More search results ({len(search_results)}) than quota ({quota}).')
+        log.warn(f'More search results ({len(search_results)}) than quota ({quota}).')
         resp = None
         while resp not in ['Y', 'N']:
             resp = input('Continue anyways?')[:1].upper()
@@ -136,7 +144,7 @@ def hyp3_pipeline(search_results: pd.DataFrame, job_name, existing_job_name: Uni
             scale = 'power', dem_matching = False, resolution = 30)
 
     # warn user this may take a few hours for big jobs
-    print(f'Watching {len(rtc_jobs)} jobs. This may take a while...')
+    log.info(f'Watching {len(rtc_jobs)} jobs. This may take a while...')
 
     # have hyp3 watch and update progress bar every 60 seconds
     hyp3.watch(rtc_jobs)
@@ -147,7 +155,7 @@ def hyp3_pipeline(search_results: pd.DataFrame, job_name, existing_job_name: Uni
     # filter out failed jobs
     failed_jobs = rtc_jobs.filter_jobs(succeeded=False, running=False, failed=True)
     if len(failed_jobs) > 0:
-        print(f'{len(failed_jobs)} jobs failed.')
+        log.info(f'{len(failed_jobs)} jobs failed.')
     
     # return only successful jobs
     return rtc_jobs.filter_jobs(succeeded = True)
@@ -165,6 +173,7 @@ def download_hyp3(jobs: sdk.jobs.Batch, area: shapely.geometry.Polygon, outdir: 
     Returns:
     images: dictionary of granule names and DataArrays
     """
+    log.debug(f"Downloading hyp3 jobs into {outdir}")
     # make data directory to store incoming tifs
     os.makedirs(outdir, exist_ok = True)
 

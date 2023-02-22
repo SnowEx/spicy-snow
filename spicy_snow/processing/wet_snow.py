@@ -6,6 +6,9 @@ import numpy as np
 import xarray as xr
 from typing import Union
 
+import logging
+log = logging.getLogger(__name__)
+
 def id_newly_wet_snow(dataset: xr.Dataset, wet_thresh: int = -2, inplace: bool = False) -> Union[None, xr.Dataset]:
     """
     Identifies time steps with newly wet snow. Identifies time slices where
