@@ -6,6 +6,7 @@ from os.path import join
 import xarray as xr
 import shapely.geometry
 from typing import Tuple, Union
+import logging
 
 # Add main repo to path
 import sys
@@ -29,11 +30,15 @@ from spicy_snow.processing.snow_index import calc_delta_VV, calc_delta_cross_rat
 from spicy_snow.processing.wet_snow import id_newly_frozen_snow, id_newly_wet_snow, \
     id_wet_negative_si, flag_wet_snow
 
+# setup root logger
+from spicy_snow.utils.spicy_logging import setup_logging
+
 def retrieve_snow_depth(area: shapely.geometry.Polygon, 
                         dates: Tuple[str, str], 
                         work_dir: str = './',
                         job_name: str = 'spicy-snow-run',
-                        existing_job_name: Union[bool, str] = False) -> xr.Dataset:
+                        existing_job_name: Union[bool, str] = False,
+                        debug: bool = False) -> xr.Dataset:
     """
     Finds, downloads Sentinel-1, forest cover, water mask, snow coverage. Then retrieves snow depth
     using Lievens et al. 2021 method.
@@ -43,6 +48,8 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
     dates: Start and end date to search between
     work_dir: filepath to directory to work in. Will be created if not existing
     job_name: name for hyp3 job
+    existing_job_name: name for preexisiting hyp3 job to download and avoid resubmitting
+    debug: do you want to get verbose logging?
 
     Returns:
     datset: Xarray dataset with 'snow_depth' and 'wet_snow' variables for all Sentinel-1
@@ -50,11 +57,14 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
     """
     os.makedirs(work_dir , exist_ok = True)
 
+    setup_logging(log_dir = join(work_dir, 'logs'), debug = debug)
+    log = logging.getLogger(__name__)
+
     ## Downloading Steps
 
     # get asf_search search results
     search_results = s1_img_search(area, dates)
-    print(f'Found {len(search_results)} results')
+    log.info(f'Found {len(search_results)} results')
 
     # download s1 images into dataset ['s1'] keyword
     jobs = hyp3_pipeline(search_results, job_name = job_name, existing_job_name = existing_job_name)
@@ -71,7 +81,7 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
     ds = download_fcf(ds, join(work_dir, 'tmp', 'fcf.tif'))
 
     ## Preprocessing Steps
-    print("Preprocessing Sentinel-1 images")
+    log.info("Preprocessing Sentinel-1 images")
     # subset dataset by flight_dir and platform
     dict_ds = subset_s1_images(ds)
 
@@ -91,7 +101,7 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
     # ds = s1_incidence_angle_masking(ds)
 
     ## Snow Index Steps
-    print("Calculating snow index")
+    log.info("Calculating snow index")
     # calculate delta CR and delta VV
     ds = calc_delta_cross_ratio(ds)
     ds = calc_delta_VV(ds)
@@ -109,7 +119,7 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
     ds = calc_snow_index_to_snow_depth(ds)
 
     ## Wet Snow Flags
-    print("Flag wet snow")
+    log.info("Flag wet snow")
     # find newly wet snow
     ds = id_newly_wet_snow(ds)
     ds = id_wet_negative_si(ds)

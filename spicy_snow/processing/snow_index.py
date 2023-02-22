@@ -8,6 +8,9 @@ import xarray as xr
 
 from typing import Union
 
+import logging
+log = logging.getLogger(__name__)
+
 def calc_delta_VV(dataset: xr.Dataset, inplace: bool = False) -> Union[None, xr.Dataset]:
     """
     Calculate change in VV amplitude between current time step and previous
@@ -149,6 +152,7 @@ def clip_delta_gamma_outlier(dataset: xr.Dataset, thresh: float = 3, inplace: bo
 
     Args:
     dataset: Xarray Dataset of sentinel images with delta-gamma
+    thresh: threshold in dB to clip delta Gamma to
 
     Returns:
     dataset: Xarray Dataset of sentinel images with delta gamma changes clipped
@@ -211,10 +215,16 @@ def calc_prev_snow_index(dataset: xr.Dataset, current_time: np.datetime64, repea
     t_oldest, t_youngest = pd.to_datetime(t_prev - (repeat - pd.Timedelta('1 day'))) , pd.to_datetime(t_prev + (repeat - pd.Timedelta('1 day')))
     # slice dataset to get all images in previous period
     prev = dataset.sel(time = slice(t_oldest, t_youngest))
+
     # calculate weights based on days between centered date and image acquistions
-    wts = repeat.days - np.abs([int((t - t_prev).days) for t in prev.time.values])
+    day_weights = repeat.days - np.abs([int((t - t_prev).days) for t in prev.time.values])
+    wts = xr.ones_like(prev['snow_index']) * day_weights
+
+    # set wts to nan where snow_index is nan
+    wts = wts.where(~prev['snow_index'].isnull())
+
     # calculate previous snow index weighted by time from last acquistion
-    prev_si = (prev['snow_index']*wts).sum(dim = 'time')/np.sum(wts)
+    prev_si = (prev['snow_index'] * wts).sum(dim = 'time', skipna = True) / wts.sum(dim = 'time', skipna = True)
     # this is weird but works
     # (prev['snow_index']*wts).sum(dim = 'time') treats nans as 0 so they don't
     # propogate through time series (maybe a problem later for wet snow masking)
@@ -250,17 +260,22 @@ def calc_snow_index(dataset: xr.Dataset, inplace: bool = False) -> Union[None, x
 
     # iterate through time steps
     for ct in dataset.time.values:
+
         # calculate previous snow index
         prev_si = calc_prev_snow_index(dataset, ct, repeat)
+
+        # set prev_si to 0 at nans
+        prev_si = prev_si.where(~prev_si.isnull(), 0)
         
-        # add deltaGamma to previous snow inded
+        # add deltaGamma to previous snow index
         dataset['snow_index'].loc[dict(time = ct)] = prev_si + dataset['deltaGamma'].sel(time = ct)
         
         # change to 0 when ims snow cover is not 4
         dataset['snow_index'].loc[dict(time = ct)] = dataset['snow_index'].sel(time = ct).where(dataset['ims'].sel(time = ct) == 4, 0)
 
-        # change to 0 when snow_index is negative and change nans to 0
-        dataset['snow_index'].loc[dict(time = ct)] = dataset['snow_index'].sel(time = ct).where(dataset['snow_index'].sel(time = ct) > 0, 0)
+        # change to 0 when snow_index is negative
+        dataset['snow_index'].loc[dict(time = ct)] = \
+            dataset['snow_index'].sel(time = ct).where((dataset['snow_index'].sel(time = ct).isnull()) | (dataset['snow_index'].sel(time = ct) > 0), 0)
     
     if not inplace:
         return dataset
