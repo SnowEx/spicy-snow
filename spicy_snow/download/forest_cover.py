@@ -35,9 +35,9 @@ def download_fcf(dataset: xr.Dataset, out_fp: str) -> xr.Dataset:
     # open as dataArray and return
     fcf = rxa.open_rasterio(out_fp)
 
+    # reproject FCF and clip to match dataset
     log.debug(f"Clipping FCF to {dataset['s1'].rio.bounds()}")
-    # clip FCF to dataset boundaries (from user defined geometry)
-    fcf = fcf.rio.clip_box(*dataset['s1'].rio.bounds())
+
     # reproject FCF to match dataset
     fcf = fcf.rio.reproject_match(dataset['s1'])
     # remove band dimension as it only has one band

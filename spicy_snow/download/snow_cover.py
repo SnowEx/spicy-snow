@@ -54,20 +54,6 @@ def get_ims_day_data(year: str, doy: str, tmp_dir: str) -> xr.DataArray:
     os.chdir(cd)
     return ims
 
-def add_ims_data(dataset: xr.Dataset, ims: xr.DataArray) -> xr.Dataset:
-    """
-    Add xarray dataArray of IMS data to a larger xarray Dataset.
-
-    Args:
-    dataset: large dataset to add IMS data to
-    ims: IMS dataArray for all days of data
-    date: Date of IMS retrieval
-    """
-    # reproject to match dataset
-    ims = ims.rio.reproject_match(dataset['s1'])
-    # add as 'ims' data variable to s1 dataset
-    dataset = xr.merge([dataset, ims.rename('ims')])
-    return dataset
 
 def download_snow_cover(dataset: xr.Dataset, tmp_dir: str = './tmp', clean: bool = True) -> xr.Dataset:
     """
@@ -90,13 +76,15 @@ def download_snow_cover(dataset: xr.Dataset, tmp_dir: str = './tmp', clean: bool
         ims = get_ims_day_data(day.year, f'{day.dayofyear:03}', tmp_dir = tmp_dir) #revert to clean = True at somepoint
         # add timestamp info
         ims = ims.assign_coords(time = [day])
+        # reproject and clip to match dataset
+        ims = ims.rio.reproject_match(dataset['s1'])
         # add day to list of ims days
         all_ims.append(ims)
     # make dataArray of all IMS images
     full_ims = xr.concat(all_ims, dim = 'time')
 
     # add dataArray of IMS to the sentinel-1 dataset with timestamp information
-    dataset = add_ims_data(dataset, full_ims)
+    dataset = xr.merge([dataset, full_ims.rename('ims')])
     
     # remove data directory of downloaded IMS tifs
     if clean == True:
