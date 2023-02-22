@@ -38,14 +38,14 @@ Lievens et al 2021 - https://tc.copernicus.org/articles/16/159/2022/
     - [x] Calculate \triangle \gamma_{CR} and \triangle \gamma_{VV}
     - [x] Calculate combined values \gamma
     - [x] Calculate previous SI using weighted +- 5/11 days SI
-    - [ ] Calculate SI and SD, uses snow cover from IMS too
-    - [ ] Wet snow mask update based on -2dB or +2dB changes
-    - [ ] Coarsen to appropriate resolution
+    - [x] Calculate SI and SD, uses snow cover from IMS too
+    - [x] Wet snow mask update based on -2dB or +2dB changes, negative SI
+    - [x] Coarsen to appropriate resolution
 
 - [ ] Output: 
     - [ ] xarray netcdf of snow depths
     
-- [ ] Tests
+- [x] Tests
 
 ## Example Installation
 
