@@ -65,7 +65,7 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
     ds = merge_partial_s1_images(ds)
 
     # download IMS snow cover and add to dataset ['ims'] keyword
-    ds = download_snow_cover(ds, area, tmp_dir = join(work_dir, 'tmp'), clean = False)
+    ds = download_snow_cover(ds, tmp_dir = join(work_dir, 'tmp'), clean = False)
 
     # download fcf and add to dataset ['fcf'] keyword
     ds = download_fcf(ds, join(work_dir, 'tmp', 'fcf.tif'))

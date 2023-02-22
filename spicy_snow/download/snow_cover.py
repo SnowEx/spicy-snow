@@ -60,8 +60,7 @@ def add_ims_data(dataset: xr.Dataset, ims: xr.DataArray) -> xr.Dataset:
     dataset = xr.merge([dataset, ims.rename('ims')])
     return dataset
 
-def download_snow_cover(dataset: xr.Dataset, area: shapely.geometry.Polygon, 
-                        tmp_dir: str = './tmp', clean: bool = True) -> xr.Dataset:
+def download_snow_cover(dataset: xr.Dataset, tmp_dir: str = './tmp', clean: bool = True) -> xr.Dataset:
     """
     Download IMS snow-cover images.
 
@@ -85,7 +84,7 @@ def download_snow_cover(dataset: xr.Dataset, area: shapely.geometry.Polygon,
         # reproject to WGS84
         ims = ims.rio.reproject('EPSG:4326')
         # clip to user specified area
-        ims = ims.rio.clip([area], 'EPSG:4326')
+        ims = ims.rio.clip_box(*dataset['s1'].rio.bounds())
         # add day to list of ims days
         all_ims.append(ims)
     # make dataArray of all IMS images
