@@ -1,7 +1,8 @@
 import pickle
 import shapely
 from glob import glob
-from os.path import join
+import os
+from os.path import join, exists
 import pandas as pd
 import xarray as xr
 import rioxarray as rxa
@@ -17,15 +18,12 @@ from spicy_snow.download.snowex_lidar import download_dem, download_snow_depth,\
       download_veg_height, make_site_ds
 
 lidar_dir = '../data/lidar'
-download_snow_depth(lidar_dir)
-download_veg_height(lidar_dir)
-download_dem(lidar_dir)
+# download_snow_depth(lidar_dir)
+# download_veg_height(lidar_dir)
+# download_dem(lidar_dir)
 
-sites = {'USCOCP': 'Cameron', 'USCOFR': 'Frasier', 'USIDBS': 'Banner', 'USIDDC': 'Dry_Creek',
-         'USIDMC': 'Mores', 'USUTLC': 'Little_Cottonwood'}
-
-sites = {'USCOFR': 'Frasier', 'USIDBS': 'Banner', 'USIDDC': 'Dry_Creek',
-         'USIDMC': 'Mores', 'USUTLC': 'Little_Cottonwood'}
+sites = {'USCOCP': 'Cameron', 'USCOFR': 'Frasier', 'USIDBS': 'Banner', 
+         'USIDDC': 'Dry_Creek', 'USIDMC': 'Mores', 'USUTLC': 'Little_Cottonwood'}
 
 for site, site_name in sites.items():
     print(''.center(40, '-'))
@@ -38,10 +36,19 @@ for site, site_name in sites.items():
     area = shapely.geometry.box(*lidar_ds.rio.bounds())
 
     for date in lidar_ds.time:
+        os.makedirs('../SnowEx-Data', exist_ok = True)
+        out_nc = f'../SnowEx-Data/{site_name}_{(date).dt.strftime("%Y-%m-%d").values}.nc'
+
+        if exists(out_nc):
+            print(f'Outfile {out_nc} exists already.')
+            continue
+
         print(f'Starting {site_name} snow depth @ {date.values}')
 
         if date.dt.month > 4:
             continue
+
+        lidar_ds = lidar_ds.sel(time = date)
 
         if date.dt.month < 8:
             date1 = pd.to_datetime(f'{int(date.dt.year - 1)}-08-01')
@@ -50,7 +57,8 @@ for site, site_name in sites.items():
 
         dates = (date1.strftime('%Y-%m-%d'), pd.to_datetime((date + pd.Timedelta('14 day')).values).strftime('%Y-%m-%d'))
 
-        spicy_ds = retrieve_snow_depth(area = area, dates = dates, work_dir = '../data/', job_name = f'spicy-{site}-{dates[1]}', existing_job_name = f'spicy-{site}-{dates[1]}')
+        spicy_ds = retrieve_snow_depth(area = area, dates = dates, work_dir = '../data/', job_name = f'spicy-{site}-{dates[1]}', existing_job_name = f'spicy-{site}')
+        # spicy_ds = retrieve_snow_depth(area = area, dates = dates, work_dir = '../data/', job_name = f'spicy-{site}-{dates[1]}', existing_job_name = f'spicy-{site}-{dates[1]}')
 
         lidar_ds = lidar_ds.rio.reproject_match(spicy_ds)
 
@@ -60,11 +68,9 @@ for site, site_name in sites.items():
 
         ds.attrs['site'] = site_name
         ds.attrs['site_abbrev'] = site
-
-        with open(f'../SnowEx-Data/{site_name}_{(date).dt.strftime("%y-%m-%d").values}.pkl', 'wb') as f:
-            pickle.dump(ds, f)
+        ds.attrs['lidar-flight-time'] = str((date).dt.strftime("%Y-%m-%d").values)
         
         try:
-            ds.to_netcdf(f'../SnowEx-Data/{site_name}_{(date).dt.strftime("%y-%m-%d").values}.nc')
+            ds.to_netcdf(out_nc)
         except:
             print('Unable to create netcdf4 for {site_name}')
