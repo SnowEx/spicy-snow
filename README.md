@@ -21,7 +21,7 @@ Lievens et al 2021 - https://tc.copernicus.org/articles/16/159/2022/
 - [x] Pseudo-code
 - [x] Logging system
 
-- [ ] User Inputs: 
+- [x] User Inputs: 
     - [x] dates 
     - [x] geographic area
 
@@ -42,8 +42,8 @@ Lievens et al 2021 - https://tc.copernicus.org/articles/16/159/2022/
     - [x] Wet snow mask update based on -2dB or +2dB changes, negative SI
     - [x] Coarsen to appropriate resolution
 
-- [ ] Output: 
-    - [ ] xarray netcdf of snow depths
+- [x] Output: 
+    - [x] xarray netcdf of snow depths
     
 - [x] Tests
 
