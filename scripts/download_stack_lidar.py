@@ -57,8 +57,8 @@ for site, site_name in sites.items():
 
         dates = (date1.strftime('%Y-%m-%d'), pd.to_datetime((date + pd.Timedelta('14 day')).values).strftime('%Y-%m-%d'))
 
-        spicy_ds = retrieve_snow_depth(area = area, dates = dates, work_dir = '../data/', job_name = f'spicy-{site}-{dates[1]}', existing_job_name = f'spicy-{site}')
-        # spicy_ds = retrieve_snow_depth(area = area, dates = dates, work_dir = '../data/', job_name = f'spicy-{site}-{dates[1]}', existing_job_name = f'spicy-{site}-{dates[1]}')
+        # spicy_ds = retrieve_snow_depth(area = area, dates = dates, work_dir = '../data/', job_name = f'spicy-{site}-{dates[1]}', existing_job_name = f'spicy-{site}')
+        spicy_ds = retrieve_snow_depth(area = area, dates = dates, work_dir = '../data/', job_name = f'spicy-{site}-{dates[1]}', existing_job_name = f'spicy-{site}-{dates[1]}')
 
         lidar_ds = lidar_ds.rio.reproject_match(spicy_ds)
 
