@@ -57,8 +57,6 @@ for site, site_name in sites.items():
 
         ds.attrs['site'] = site_name
         ds.attrs['site_abbrev'] = site
-        ds.attrs['lidar-date'] = date.dt.strftime("%y-%m-%d").values
-
 
         with open(f'../SnowEx-Data/{site_name}_{(date).dt.strftime("%y-%m-%d").values}.pkl', 'wb') as f:
             pickle.dump(ds, f)

@@ -245,8 +245,7 @@ def s1_clip_outliers(dataset: xr.Dataset, inplace: bool = False) -> xr.Dataset:
     for band in ['VV','VH']:
         data = dataset['s1'].sel(band=band)
 
-        thresh_lo = data.quantile(0.1, skipna = True)
-        thresh_hi = data.quantile(0.9, skipna = True)
+        thresh_lo, thresh_hi = data.quantile([0.1, 0.9], skipna = True)
         thresh_lo -= 3
         thresh_hi += 3
         # Mask using percentile thresholds
