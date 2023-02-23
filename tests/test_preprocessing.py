@@ -190,7 +190,7 @@ class TestSentinel1PreProcessing(unittest.TestCase):
     direction = np.resize(['ascending', 'descending'], (n))
 
     test_ds = xr.Dataset(data_vars= dict(
-        data = (["x", "y", "time"], data)
+        s1 = (["x", "y", "time"], data)
             ),
         coords = dict(
                             lon = (["x", "y"], lon),

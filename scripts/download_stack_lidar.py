@@ -25,6 +25,8 @@ sites = {'USCOCP': 'Cameron', 'USCOFR': 'Frasier', 'USIDBS': 'Banner', 'USIDDC':
          'USIDMC': 'Mores', 'USUTLC': 'Little_Cottonwood'}
 
 for site, site_name in sites.items():
+    print(''.center(40, '-'))
+    print(f'Starting {site_name}')
 
     lidar_ds = make_site_ds(site, lidar_dir = lidar_dir)
 
@@ -33,8 +35,9 @@ for site, site_name in sites.items():
     area = shapely.geometry.box(*lidar_ds.rio.bounds())
 
     for date in lidar_ds.time:
+        print(f'Starting {site_name} snow depth @ {date.values}')
 
-        if date.dt.month > 5:
+        if date.dt.month > 4:
             continue
 
         if date.dt.month < 8:
@@ -52,5 +55,15 @@ for site, site_name in sites.items():
 
         ds = ds[['lidar-sd', 'lidar-vh', 'lidar-dem', 'snow_depth', 's1', 'wet_snow']]
 
+        ds.attrs['site'] = site_name
+        ds.attrs['site_abbrev'] = site
+        ds.attrs['lidar-date'] = date.dt.strftime("%y-%m-%d").values
+
+
         with open(f'../SnowEx-Data/{site_name}_{(date).dt.strftime("%y-%m-%d").values}.pkl', 'wb') as f:
             pickle.dump(ds, f)
+        
+        try:
+            ds.to_netcdf(f'../SnowEx-Data/{site_name}_{(date).dt.strftime("%y-%m-%d").values}.nc')
+        except:
+            print('Unable to create netcdf4 for {site_name}')
