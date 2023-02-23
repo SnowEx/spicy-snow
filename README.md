@@ -22,15 +22,15 @@ Lievens et al 2021 - https://tc.copernicus.org/articles/16/159/2022/
 - [x] Logging system
 
 - [ ] User Inputs: 
-    - [ ] dates 
-    - [ ] geographic area
-    - [ ] others?
+    - [x] dates 
+    - [x] geographic area
 
 - [x] Data products to pull in:
     - [x] Sentinel 1 - orbit file, border noise, thermal noise, radiometric calibration, terrain flattened, gamma_0, range dopper terrain correction, averaged to 100m, mask out incidence angles >70
     - [x] Snow cover (0/1) - Interactive multisensor snow and ice mapping system
     - [ ] Glacier cover from Randolph Glacier Inventory 6.0
     - [x] Forest Cover Fraction from copernicus PROBA-V dataset
+    - [ ] Water cover from PROBA-V dataset
 
 - [x] Processing steps
     - [x] Rescale by mean for all orbits to overall mean
@@ -56,21 +56,23 @@ pip install c_snow
 ## Example usage:
 
 ```python
-from spicy_snow.retrievals import retrieve_snow_depth
+from spicy_snow import retrieve_snow_depth
+from spicy_snow.IO.user_dates import get_input_dates
 
 import shapely
 
 # Provide bounding box (EPSG:4326 user-provided coordinates)
 area = shapely.geometry.box(-115, 43, -114, 44)
 
-# Provide dates as tuple of strings. First date should always be August 1st
-dates = ("2019-08-01", "2020-04-01")
+# Get tuple of dates. Provided date is ending date and start date is always prior August 1st
+dates = get_input_dates("2020-04-01")
 
 # Function to actually get data, run processing, returns xarray dataset w/ daily time dimension
 s1_sd = get_s1_snow_depth(area, dates, work_dir = './idaho_retrieval/) 
 
 # work_dir will be created if not present 
-# optional keyword ideas: job_name, fitting parameters (A, B, C), exisiting_job_name
+# optional keyword ideas: job_name, fitting parameters (A, B, C), exisiting_job_name, outfp
+# `outfp = './idaho_ret.nc` will output datset to netcdf
 
 # plot first day of 2020 to check data quality
 s1_sd.sel(time = "2020-01-01").plot()
