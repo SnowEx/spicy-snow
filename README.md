@@ -5,13 +5,13 @@
 
 # spicy-snow
 
-Python module to use volumetric scattering at C-band to calculate snow depths from Sentinel-1 imagery using Lieven et al.'s 2021 technique
+Python module to use volumetric scattering at C-band to calculate snow depths from Sentinel-1 imagery using Lieven et al.'s 2021 technique.
+
+The relevant papers for this repository technique are:
 
 Lievens et al 2019 - https://www.nature.com/articles/s41467-019-12566-y
-- the original nature paper. Methods are at the bottom.
 
 Lievens et al 2021 - https://tc.copernicus.org/articles/16/159/2022/
-- Similar process to the 2019 paper, but with wet snow masking and a few other tweaks.
 
 <img src="https://github.com/SnowEx/spicy-snow/blob/main/title-img.png" width="800">
 
@@ -82,65 +82,6 @@ s1_sd.sel(time = "2020-01-01").plot()
 with open('./idaho_retrieval/spicy_test.pkl', 'wb') as f:
     pickle.dump(ds, f)
 ```
-
-## Proposed Directory Structure:
-
-- c-snow
-    - download
-        - s1_imgs.py
-            * s1_img_search(area: shapely geom, dates: pd_time_slice) -> pd dataframe : find dates and url of s1 overpasses and returns granule names
-                - https://hyp3-docs.asf.alaska.edu/using/sdk_api/
-                - https://nbviewer.org/github/ASFHyP3/hyp3-sdk/blob/main/docs/sdk_example.ipynb
-            * download_s1_imgs(urls: pd dataframe) -> xarray : takes granule names of s1 images and download them and return xarray dataset of s1 images
-        - ancillary_data.py
-            * snow_cover_search(area: shapely geom, dates: (string, string)) -> pd dataframe : find url of IMS snow on/off images
-            * download_snow_cover_imgs(urls: pd dataframe, s1_dataset: xarray dataset) -> xarray : takes urls of IMS snow on/off images and download them and adds to the sentinel 1 xarray dataset as a variable/band
-            * fcf_search(area: shapely geom, dates: (string, string)) -> pd dataframe : find url of PROBA-V forest cover fraction images
-            * download_fcf_imgs(urls: pd dataframe, s1_dataset: xarray dataset) -> xarray : takesPROBA-V forest cover fraction images and download them and adds to the sentinel 1 xarray dataset as a variable/band
-    - constants
-        - CONSTANTS.py - constants to be used (resolution standards, band/variable names, etc)
-    - utils - function to be used in multiple places
-        - download_utils.py
-        - radar_utils.py
-        - c_snow_exceptions.py
-    - processing
-        - preprocessing.py
-            * s1_orbit_averaging(s1_ds: xarray dataset) -> s1_ds : do the mean averaging to allow for different orbits to be compared
-            * s1_clip_outliers(s1_ds: xarray dataset) -> s1_ds : clip outliers 3dB above or below 90th percentile
-            * calc_d_gamma_cr(s1_ds: xarray dataset) -> s1_ds: calculate d_gamma_cr using s1 images and FCF
-            * calc_d_gamma_VV(s1_ds: xarray dataset) -> s1_ds: calculate d_gamma_vv using s1 images and FCF
-            * calc_d_gamma(s1_ds: xarray dataset) -> s1_ds: calculate d_gamma using d_gamma_cr and d_gamma_vv
-        - snow_index.py
-            * calc_snow_index(s1_ds: xarray dataset) -> s1_ds: calculate snow index using d_gamma, wet snow mask and IMS snowon/snowoff
-        - wet_snow_mask.py
-            * find_wet_snow(s1_ds: xarray dataset) -> s1_ds : find pixels that have either dried (+2dB) or wetted (-2 dB)
-            * update_wet_snow(s1_ds: xarray dataset) -> s1_ds : set wet snow mask pixels as wet or dry based on previous time step's classification and threshold change
-        - get_s1_snowdepth.py
-            * calc_snow_depth(s1_ds: xarray dataset) -> s1_ds : final step using snow index and wet snow mask to calculate snow depths 
-    - IO
-        - user_input.py
-            * get_user_geometry(coordinates: (float, float, float, float)) -> shapely geom : take coordinates from user function call and return shapely geometry w/ error checking
-            * get_user_dates(dates: (string, string) -> pd_time_slice : take user input and convert to pandas date/time slice in days w/ error checking
-            * get_user_filepath(filepath: string) -> get the filepath to save output at w/ error checking
-        - netcdf_export.py
-            * save_netcdf(output_fp : string, s1_ds: xarray dataset) -> None : take final s1 dataset and save out variable for retrieved snow depth
-- notebooks
-    - basic_example.ipynb
-- tests
-    - test_data
-        - expected_output_dataset.pkl
-        - expected_input_dataset.pkl
-    - test_downloads.py
-    - test_inputs.py
-    - test_processing.py
-    - test_outputs.py
-- images
-    - cover_img.png
-    - example_output.png
-- README.md
-- environment.yml
-- LICENSE
-- .gitignore
 
 ## Contributing
 
