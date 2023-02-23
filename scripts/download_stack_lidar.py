@@ -24,6 +24,9 @@ download_dem(lidar_dir)
 sites = {'USCOCP': 'Cameron', 'USCOFR': 'Frasier', 'USIDBS': 'Banner', 'USIDDC': 'Dry_Creek',
          'USIDMC': 'Mores', 'USUTLC': 'Little_Cottonwood'}
 
+sites = {'USCOFR': 'Frasier', 'USIDBS': 'Banner', 'USIDDC': 'Dry_Creek',
+         'USIDMC': 'Mores', 'USUTLC': 'Little_Cottonwood'}
+
 for site, site_name in sites.items():
     print(''.center(40, '-'))
     print(f'Starting {site_name}')
@@ -47,7 +50,7 @@ for site, site_name in sites.items():
 
         dates = (date1.strftime('%Y-%m-%d'), pd.to_datetime((date + pd.Timedelta('14 day')).values).strftime('%Y-%m-%d'))
 
-        spicy_ds = retrieve_snow_depth(area = area, dates = dates, work_dir = '../data/', job_name = f'spicy-{site}', existing_job_name = f'spicy-{site}')
+        spicy_ds = retrieve_snow_depth(area = area, dates = dates, work_dir = '../data/', job_name = f'spicy-{site}-{dates[1]}', existing_job_name = f'spicy-{site}-{dates[1]}')
 
         lidar_ds = lidar_ds.rio.reproject_match(spicy_ds)
 

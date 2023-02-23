@@ -38,7 +38,8 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
                         work_dir: str = './',
                         job_name: str = 'spicy-snow-run',
                         existing_job_name: Union[bool, str] = False,
-                        debug: bool = False) -> xr.Dataset:
+                        debug: bool = False,
+                        outfp: Union[str, bool] = False) -> xr.Dataset:
     """
     Finds, downloads Sentinel-1, forest cover, water mask, snow coverage. Then retrieves snow depth
     using Lievens et al. 2021 method.
@@ -50,6 +51,7 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
     job_name: name for hyp3 job
     existing_job_name: name for preexisiting hyp3 job to download and avoid resubmitting
     debug: do you want to get verbose logging?
+    outfp: do you want to save netcdf? default is False and will just return dataset
 
     Returns:
     datset: Xarray dataset with 'snow_depth' and 'wet_snow' variables for all Sentinel-1
@@ -129,6 +131,13 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
 
     # make wet_snow flag
     ds = flag_wet_snow(ds)
+
+    if outfp:
+
+        if outfp.split('.')[-1] != 'nc':
+            outfp = outfp + '.nc'
+            
+        ds.to_netcdf(outfp)
 
     return ds
 
