@@ -10,7 +10,7 @@ from rioxarray.merge import merge_arrays
 import shapely.geometry
 from datetime import date
 from tqdm import tqdm
-
+from glob import glob
 
 import sys
 from os.path import expanduser
@@ -138,3 +138,41 @@ def download_veg_height(out_dir = './tmp'):
         quit()
     
     os.chdir(old_cd)
+
+def make_site_ds(site: str, lidar_dir: str) -> xr.Dataset:
+    """
+    Makes a dataset of snow depth, veg height, and DEM for a specific site abbreviation
+    in the lidar directory. Returns it reprojected to EPSG4326.
+
+    Args:
+    site: Site abbreviation to search for
+    lidar_dir: Direction of lidar tiffs
+
+    Returns:
+    dataset: xarray dataset of dem, sd, vh for site
+    """
+
+    dataset = xr.Dataset()
+
+    for img_type in ['SD', 'VH', 'DEM']:
+        files = glob(join(lidar_dir, f'*_{img_type}_*_{site}_*.tif'))
+        assert files, f"No files found for {img_type} at {site}"
+        
+        imgs = []
+        for f in files:
+
+            date = pd.to_datetime(basename(f).split('_')[-2])
+
+            img = rxa.open_rasterio(f)
+
+            img = img.squeeze(dim = 'band')
+            
+            img = img.expand_dims(time = [date])
+
+            imgs.append(img)
+    
+        dataset['lidar-' + img_type.lower()] = xr.concat(imgs, dim = 'time')
+
+    dataset = dataset.rio.reproject('EPSG:4326')
+    
+    return dataset

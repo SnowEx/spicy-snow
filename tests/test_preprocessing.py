@@ -10,7 +10,7 @@ from os.path import expanduser
 sys.path.append(expanduser('./'))
 from spicy_snow.processing.s1_preprocessing import s1_power_to_dB, s1_dB_to_power, \
     merge_partial_s1_images, s1_clip_outliers, s1_orbit_averaging, subset_s1_images, \
-    merge_s1_subsets
+    merge_s1_subsets, s1_incidence_angle_masking
 
 class TestSentinel1PreProcessing(unittest.TestCase):
     """
@@ -240,6 +240,40 @@ class TestSentinel1PreProcessing(unittest.TestCase):
 
         self.assertTrue(v.all())
 
+    def test_incidence_angle_mask(self):
+
+        backscatter = np.random.randn(10, 10, 6, 3)
+        deltaGamma = np.random.randn(10, 10 , 6)
+        ims = np.full((10, 10, 6), 4)
+        times = [np.datetime64(t) for t in ['2020-01-01','2020-01-02', '2020-01-07','2020-01-08', '2020-01-14', '2020-01-15']]
+        x = np.linspace(0, 9, 10)
+        y = np.linspace(10, 19, 10)
+        lon, lat = np.meshgrid(x, y)
+
+        test_ds = xr.Dataset(
+            data_vars = dict(
+                s1 = (["x", "y", "time", "band"], backscatter),
+                deltaGamma = (["x", "y", "time"], deltaGamma),
+                ims = (["x", "y", "time"], ims),
+            ),
+
+            coords = dict(
+                lon = (["x", "y"], lon),
+                lat = (["x", "y"], lat),
+                band = ['VV', 'VH', 'inc'],
+                time = times,
+                relative_orbit = (["time"], [24, 1, 24, 1, 24, 1])))
+
+
+        test_ds['s1'].loc[dict(time = test_ds.time[0], x = 0, y = 0, band = 'inc')] = 2
+        test_ds['s1'].loc[dict(time = test_ds.time[0], x = 0, y = 1, band = 'inc')] = 0.4
+        ds = s1_incidence_angle_masking(test_ds)
+
+        self.assertTrue(ds['s1'].sel(time = test_ds.time[0], x= 0, y = 0, band = 'VV').isnull())
+
+        self.assertTrue(~ds['s1'].sel(time = test_ds.time[0], x= 0, y = 1, band = 'VV').isnull())
+
+        
         
 if __name__ == '__main__':
     unittest.main()
