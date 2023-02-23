@@ -159,3 +159,66 @@
 
 #     if not inplace:
         # return dataset
+
+
+### LIDAR SCRAPS
+
+# import numpy as np
+# import pandas as pd
+# import xarray as xr
+# import rioxarray as rxa
+# import matplotlib.pyplot as plt
+
+
+# import sys
+# sys.path.append('/Users/zachkeskinen/Documents/spicy-snow/')
+
+# import pickle
+# with open('/Users/zachkeskinen/Documents/spicy-snow/data/banner_lidar.pkl', 'rb') as f:
+#     ds = pickle.load(f)
+# spicy_sd = ds.isel(time = 81)['snow_depth']
+
+# lidar = rxa.open_rasterio('/Users/zachkeskinen/Desktop/SNEX20_QSI_SD_0.5M_USIDBS_20210315_20210315.tif')
+# xmin, ymin, xmax, ymax = lidar.rio.bounds()
+# import pyproj
+# proj = pyproj.Transformer.from_crs(6340, 4326, always_xy=True)
+# xmin, ymin = proj.transform(xmin, ymin)
+# xmax, ymax = proj.transform(xmax, ymax)
+
+# spicy_sd = spicy_sd.rio.clip_box(*[xmin, ymin, xmax, ymax])
+
+# spicy_sd = spicy_sd.rio.write_nodata(np.nan)
+# lidar = lidar.rio.write_nodata(np.nan)
+
+# lidar = lidar.rio.reproject_match(spicy_sd)
+# spicy_sd = spicy_sd.where(~lidar.isnull())
+# lidar = lidar.squeeze(dim = 'band')
+
+# import matplotlib.pyplot as plt
+
+# def plot_xarray_2dhist(x, y, ax):
+#     x = x.values.ravel()
+#     y = y.values.ravel()
+
+#     xtmp = x[(~np.isnan(x) & ~np.isnan(y)) & (y != 0)]
+#     y = y[(~np.isnan(x) & ~np.isnan(y)) & (y != 0)]
+
+#     ax.hist2d(x = xtmp, y = y, bins = 150)
+
+# fig, ax = plt.subplots()
+# plot_xarray_2dhist(lidar, spicy_sd, ax)
+# plt.title('Comparison of Banner March 15th Spicy SD and Lidar SD')
+# plt.xlim(0,5)
+# plt.ylim(0,5)
+
+# fig, axes = plt.subplots(2, figsize = (12,8))
+
+# lidar.plot(ax = axes[0], vmin = 0, vmax = 4)
+# spicy_sd.plot(ax = axes[1], vmin = 0, vmax = 4)
+
+# axes[0].set_title("Lidar Snow Depth")
+# axes[1].set_title("Spicy Snow Depth")
+
+# for ax in axes:
+#     ax.set_xlabel('')
+#     ax.set_ylabel('')

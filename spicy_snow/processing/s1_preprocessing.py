@@ -169,8 +169,9 @@ def subset_s1_images(dataset: xr.Dataset) -> Dict[str, xr.Dataset]:
         subset = subset.sel(time = subset.flight_dir == direction)
 
         # save subset to dictionary
-        subset_ds[f'{platform}-{direction}'] = subset
-        log.debug(f"{platform}-{direction}: length = {len(subset_ds[f'{platform}-{direction}'])}")
+        if len(subset['s1']) > 0:
+            subset_ds[f'{platform}-{direction}'] = subset
+            log.debug(f"{platform}-{direction}: length = {len(subset_ds[f'{platform}-{direction}'])}")
     
     return subset_ds
 
@@ -243,6 +244,7 @@ def s1_clip_outliers(dataset: xr.Dataset, inplace: bool = False) -> xr.Dataset:
     # Threshold vals 3 dB above/below percentiles
     for band in ['VV','VH']:
         data = dataset['s1'].sel(band=band)
+
         thresh_lo, thresh_hi = data.quantile([0.1, 0.9], skipna = True)
         thresh_lo -= 3
         thresh_hi += 3
@@ -275,19 +277,26 @@ def ims_water_mask(dataset: xr.Dataset) -> xr.Dataset:
 
     # mask all pixels in dataset where ims == 1 or 3.
 
-def s1_incidence_angle_masking(dataset: xr.Dataset) -> xr.Dataset:
+def s1_incidence_angle_masking(dataset: xr.Dataset, inplace: bool = False) -> xr.Dataset:
     """
     Remove s1 image outliers by masking pixels with incidence angles > 70 degrees
-
+    
     Args:
-    dataset: Xarray Dataset of sentinel images to mask incidence angle outliers
+    dataset: Xarray Dataset of sentinel images to mask
 
     Returns:
     dataset: Xarray Dataset of sentinel images with incidence angles > 70 degrees
     masked
     """
 
-    # mask pixels with incidence angle > 70 degrees
+    # Check inplace flag
+    if not inplace:
+            dataset = dataset.copy(deep=True)
+
+    dataset['s1'] = dataset['s1'].where(dataset['s1'].sel(band = 'inc') < np.deg2rad(70))
+
+    if not inplace:
+            return dataset
 
 def merge_s1_subsets(dataset_dictionary: Dict[str, xr.Dataset]) -> xr.Dataset:
     """

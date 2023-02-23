@@ -11,3 +11,4 @@ dependencies:
  - hyp3_sdk
  - asf_search
  - matplotlib
+ - netcdf4
