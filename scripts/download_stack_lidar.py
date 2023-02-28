@@ -63,7 +63,7 @@ for site, site_name in sites.items():
 
         ds = xr.merge([spicy_ds, lidar_ds], combine_attrs = 'drop_conflicts')
 
-        ds = ds[['lidar-sd', 'lidar-vh', 'lidar-dem', 'snow_depth', 's1', 'wet_snow']]
+        # ds = ds[['lidar-sd', 'lidar-vh', 'lidar-dem', 'snow_depth', 's1', 'wet_snow']]
 
         ds.attrs['site'] = site_name
         ds.attrs['site_abbrev'] = site
