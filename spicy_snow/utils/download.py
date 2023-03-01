@@ -7,6 +7,9 @@ from os.path import basename, exists
 import gzip
 from urllib.request import urlretrieve
 
+import logging
+log = logging.getLogger(__name__)
+
 def reporthook(count, block_size, total_size):
     """
     Hook for urlib downloads to get progress readout.
@@ -27,21 +30,28 @@ def url_download(url, out_fp, overwrite = False, verbose = True):
     """
     Downloads url with a progress bar and overwrite check.
     """
+    # check if file already exists
     if not exists(out_fp) or overwrite == True:
+        # progress bar for your download?
         if verbose:
-            print(f'Downloading {basename(out_fp)}.')
+            log.info(f'Downloading {basename(out_fp)}.')
             urlretrieve(url, out_fp, reporthook)
-            print('')
+            log.info('')
+        # or not?
         else:
             urlretrieve(url, out_fp)
+    # if already exists. skip download.
     else:
         if verbose:
-            print(f'{basename(out_fp)} already exists. Skipping.')
+            log.info(f'{basename(out_fp)} already exists. Skipping.')
 
 def decompress(infile, tofile):
     """
     Decompress gzipped infile to outfile location.
     """
+
+    log.debug(f"decompressing {infile} to {tofile}")
+
     with open(infile, 'rb') as inf, open(tofile, 'wb') as ouf:
         decom_str = gzip.decompress(inf.read())
         ouf.write(decom_str)

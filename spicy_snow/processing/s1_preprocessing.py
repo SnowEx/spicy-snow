@@ -10,8 +10,12 @@ import pandas as pd
 import xarray as xr
 import rioxarray
 from rioxarray.merge import merge_arrays
+from itertools import product
 
-def s1_amp_to_dB(dataset: xr.Dataset, inplace: bool = False):
+import logging
+log = logging.getLogger(__name__)
+
+def s1_power_to_dB(dataset: xr.Dataset, inplace: bool = False):
     """
     Convert s1 images from amplitude to dB
 
@@ -28,7 +32,7 @@ def s1_amp_to_dB(dataset: xr.Dataset, inplace: bool = False):
     # check for dB
     if 's1_units' in dataset.attrs.keys():
         if dataset.attrs['s1_units'] == 'dB' and not inplace:
-            print("Sentinel 1 units already in dB.")
+            log.info("Sentinel 1 units already in dB.")
             return dataset
         if dataset.attrs['s1_units'] == 'dB':
             return
@@ -39,10 +43,11 @@ def s1_amp_to_dB(dataset: xr.Dataset, inplace: bool = False):
     dataset['s1'].loc[dict(band = ['VV','VH'])] = 10 * np.log10(dataset['s1'].sel(band = ['VV','VH']))
 
     dataset.attrs['s1_units'] = 'dB'
+    
     if not inplace:
         return dataset
 
-def s1_dB_to_amp(dataset: xr.Dataset, inplace: bool = False):
+def s1_dB_to_power(dataset: xr.Dataset, inplace: bool = False):
     """
     Convert s1 images from dB to amp
 
@@ -83,10 +88,13 @@ def merge_s1_times(dataset: xr.Dataset, times: List[np.datetime64], verbose: boo
     Xarray dataset: Xarray Dataset with sentinel-1 images with times combined into one
     """
 
-    if verbose:
-        print('Merging:', times)
+    # make list of DataArrays at each time step in times
     das = [dataset.sel(time = ts)['s1'] for ts in times]
-    assert len(das) == len([d for d in das if d['relative_orbit'] == das[0]['relative_orbit']])
+
+    # check all images are same relative_orbit? 
+    assert len(das) == len([d for d in das if d['relative_orbit'] == das[0]['relative_orbit']]), \
+        "All images not of same relative orbit."
+    
     if das[0].where(das[0] == 0).notnull().sum() > 0:
         nodata_value = 0
     else:
@@ -118,7 +126,7 @@ def merge_partial_s1_images(dataset: xr.Dataset) -> xr.Dataset:
             times.append(ts)
             continue
 
-        if ts - times[0] > pd.Timedelta('1 minute'):
+        if abs(ts - times[0]) > pd.Timedelta('1 minute'):
             if len(times) == 1:
                 times = [ts]
                 continue
@@ -131,7 +139,7 @@ def merge_partial_s1_images(dataset: xr.Dataset) -> xr.Dataset:
         if ts == dataset.time.values[-1] and len(times) > 1:
             dataset = merge_s1_times(dataset, times)
             times = []
-        
+    
     return dataset
 
 def subset_s1_images(dataset: xr.Dataset) -> Dict[str, xr.Dataset]:
@@ -147,18 +155,25 @@ def subset_s1_images(dataset: xr.Dataset) -> Dict[str, xr.Dataset]:
     ascending, descending, and 1A and 1B with keys {satellite}-{direction}.
     """
 
-    # might want to use this .set_xindex to speed up searching but would need to
-    # delete after function runs.
-    # ds = ds.set_xindex('relative_orbit')
-    # ds.sel(relative_orbit = 20)
-    # otherwise:
-    # ds.where(ds.flight_dir == 'ascending', drop = True)
+    # options for platform and direction
+    platforms, directions = ['S1A','S1B'], ['descending', 'ascending']
 
-    # Calculate unique orbits, ascending, satellites
+    # make subset dictionary
+    subset_ds = {}
 
-    # Add orbit, ascending vs. descending, satellite #
+    # loop through possible combinations
+    for platform, direction in product(platforms,directions):
 
-    # split Dataset by satellite and 
+        # subset on platform and direction
+        subset = dataset.sel(time = dataset.platform == platform)
+        subset = subset.sel(time = subset.flight_dir == direction)
+
+        # save subset to dictionary
+        if len(subset['s1']) > 0:
+            subset_ds[f'{platform}-{direction}'] = subset
+            log.debug(f"{platform}-{direction}: length = {len(subset_ds[f'{platform}-{direction}'])}")
+    
+    return subset_ds
 
 def s1_orbit_averaging(dataset: xr.Dataset, inplace: bool = False) -> xr.Dataset:
     """
@@ -172,6 +187,7 @@ def s1_orbit_averaging(dataset: xr.Dataset, inplace: bool = False) -> xr.Dataset
     Returns:
     dataset: Xarray Dataset of sentinel images with all s1 images normalized to total mean
     """
+
     # check inplace flag
     if not inplace:
         dataset = dataset.copy(deep=True)
@@ -188,10 +204,13 @@ def s1_orbit_averaging(dataset: xr.Dataset, inplace: bool = False) -> xr.Dataset
         
         # calculate the overall (all orbits) mean
         overall_mean  = dataset['s1'].mean(dim = ['x','y','time']).sel(band = band)
+        log.debug(f"dataset's mean: {overall_mean}")
+
         for orbit in orbits:
             
             # calculate each orbit's mean value
             orbit_mean = dataset['s1'].sel(time = dataset.relative_orbit == orbit, band = band).mean(dim = ['x','y','time'])
+            log.debug(f"Orbit's {orbit} pre-mean: {overall_mean}")
 
             # rescale each image by the mean correction (orbit mean -> overall mean)
             dataset['s1'].loc[dict(time = dataset.relative_orbit == orbit, band = band)] = \
@@ -200,7 +219,7 @@ def s1_orbit_averaging(dataset: xr.Dataset, inplace: bool = False) -> xr.Dataset
     if not inplace:
         return dataset
 
-def s1_clip_outliers(dataset: xr.Dataset, inplace: bool = False, verbose: bool = False) -> xr.Dataset:
+def s1_clip_outliers(dataset: xr.Dataset, inplace: bool = False) -> xr.Dataset:
     """
     Remove s1 image outliers by masking pixels 3 dB above 90th percentile or
     3 dB before the 10th percentile. (-35 -> 15 dB for VV) and (-40 -> 10 for VH
@@ -209,7 +228,6 @@ def s1_clip_outliers(dataset: xr.Dataset, inplace: bool = False, verbose: bool =
     Args:
     dataset: Xarray Dataset of sentinel images to clip outliers
     inplace: boolean flag to modify original Dataset or return a new Dataset
-    verbose: flag to print out masking stats
 
     Returns:
     dataset: Xarray Dataset of sentinel images with masked outliers
@@ -226,22 +244,22 @@ def s1_clip_outliers(dataset: xr.Dataset, inplace: bool = False, verbose: bool =
     # Threshold vals 3 dB above/below percentiles
     for band in ['VV','VH']:
         data = dataset['s1'].sel(band=band)
+
         thresh_lo, thresh_hi = data.quantile([0.1, 0.9], skipna = True)
         thresh_lo -= 3
         thresh_hi += 3
         # Mask using percentile thresholds
         data_masked = data.where((data > thresh_lo) & (data < thresh_hi))
 
-        if verbose:
-            print(f'Clipping band: {band}')
-            print(f'Thresh min: {thresh_lo.values}. Thresh max: {thresh_hi.values}')
-            pre_min, pre_max = data.min().values, data.max().values
-            print(f'Data min: {pre_min}. Data max: {pre_max}')
-            min, max = data_masked.min().values, data_masked.max().values
-            print(f'Masked data min: {min}. Data max: {max}')
+
+        log.debug(f'Clipping band: {band}')
+        log.debug(f'Thresh min: {thresh_lo.values}. Thresh max: {thresh_hi.values}')
+        pre_min, pre_max = data.min().values, data.max().values
+        log.debug(f'Data min: {pre_min}. Data max: {pre_max}')
+        min, max = data_masked.min().values, data_masked.max().values
+        log.debug(f'Masked data min: {min}. Data max: {max}')
 
         dataset['s1'].loc[dict(band = band)] = data_masked
-
 
     if not inplace:
         return dataset
@@ -262,9 +280,9 @@ def ims_water_mask(dataset: xr.Dataset) -> xr.Dataset:
 def s1_incidence_angle_masking(dataset: xr.Dataset, inplace: bool = False) -> xr.Dataset:
     """
     Remove s1 image outliers by masking pixels with incidence angles > 70 degrees
-
+    
     Args:
-    dataset: Xarray Dataset of sentinel images to mask incidence angle outliers
+    dataset: Xarray Dataset of sentinel images to mask
 
     Returns:
     dataset: Xarray Dataset of sentinel images with incidence angles > 70 degrees
@@ -276,16 +294,12 @@ def s1_incidence_angle_masking(dataset: xr.Dataset, inplace: bool = False) -> xr
             dataset = dataset.copy(deep=True)
 
     # Mask pixels with incidence angle > 70 degrees
-    for band in ['inc']:
-        data = dataset['s1'].sel(band=band)
-
-        # Convert 'inc' from radians to degrees and mask array ('inc' <= 70 deg)
-        dataset['s1'].loc[dict(band = band)] = data.where(data <= np.rad2deg(70))
+    dataset['s1'] = dataset['s1'].where(dataset['s1'].sel(band = 'inc') < np.deg2rad(70))
 
     if not inplace:
-        return dataset
+            return dataset
 
-def merge_s1_subsets(dataset: Dict[str, xr.Dataset]) -> xr.Dataset:
+def merge_s1_subsets(dataset_dictionary: Dict[str, xr.Dataset]) -> xr.Dataset:
     """
     Remove s1 image outliers by masking pixels with incidence angles > 70 degrees
 
@@ -296,6 +310,8 @@ def merge_s1_subsets(dataset: Dict[str, xr.Dataset]) -> xr.Dataset:
     Returns:
     dataset: Xarray Dataset of all preprocessed sentinel images
     """
-
     # merge subsets of orbit/satellite into one Dataset
+    dataset = xr.merge(dataset_dictionary.values())
+
+    return dataset
 

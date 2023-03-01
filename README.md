@@ -5,45 +5,47 @@
 
 # spicy-snow
 
-Python module to use volumetric scattering at C-band to calculate snow depths from Sentinel-1 imagery using Lieven et al.'s 2021 technique
+Python module to use volumetric scattering at C-band to calculate snow depths from Sentinel-1 imagery using Lieven et al.'s 2021 technique.
+
+The relevant papers for this repository technique are:
 
 Lievens et al 2019 - https://www.nature.com/articles/s41467-019-12566-y
-- the original nature paper. Methods are at the bottom.
 
 Lievens et al 2021 - https://tc.copernicus.org/articles/16/159/2022/
-- Similar process to the 2019 paper, but with wet snow masking and a few other tweaks.
 
 <img src="https://github.com/SnowEx/spicy-snow/blob/main/title-img.png" width="800">
 
 ## Proposed Roadmap
 
-- [ ] Design planning
-- [ ] Pseudo-code
-- [ ] Tests
+- [x] Design planning
+- [x] Pseudo-code
+- [x] Logging system
 
-- [ ] User Inputs: 
-    - [ ] dates 
-    - [ ] geographic area
-    - [ ] others?
+- [x] User Inputs: 
+    - [x] dates 
+    - [x] geographic area
 
 - [x] Data products to pull in:
     - [x] Sentinel 1 - orbit file, border noise, thermal noise, radiometric calibration, terrain flattened, gamma_0, range dopper terrain correction, averaged to 100m, mask out incidence angles >70
     - [x] Snow cover (0/1) - Interactive multisensor snow and ice mapping system
     - [ ] Glacier cover from Randolph Glacier Inventory 6.0
     - [x] Forest Cover Fraction from copernicus PROBA-V dataset
+    - [ ] Water cover from PROBA-V dataset
 
-- [ ] Processing steps
+- [x] Processing steps
     - [x] Rescale by mean for all orbits to overall mean
     - [x] Remove observations 3dB above 90th percentile or 3dB below 10th percentile
-    - [ ] Calculate \triangle \gamma_{CR} and \triangle \gamma_{VV}
-    - [ ] Calculate combined values \gamma
-    - [ ] Calculate SI and SD, uses snow cover form IMS too
-    - [ ] Set tuning parameters: A = 2, B = 0.5, C = 0.44
-    - [ ] Wet snow mask update based on -2dB or +2dB changes
-    - [ ] Coarsen to appropriate resolution
+    - [x] Calculate \triangle \gamma_{CR} and \triangle \gamma_{VV}
+    - [x] Calculate combined values \gamma
+    - [x] Calculate previous SI using weighted +- 5/11 days SI
+    - [x] Calculate SI and SD, uses snow cover from IMS too
+    - [x] Wet snow mask update based on -2dB or +2dB changes, negative SI
+    - [x] Coarsen to appropriate resolution
 
-- [ ] Output: 
-    - [ ] xarray netcdf of snow depths
+- [x] Output: 
+    - [x] xarray netcdf of snow depths
+    
+- [x] Tests
 
 ## Example Installation
 
@@ -54,85 +56,32 @@ pip install c_snow
 ## Example usage:
 
 ```python
-from spicy-snow import get_s1_snow_depth, bounding_box
-import rioxarray as rxa
+from spicy_snow import retrieve_snow_depth
+from spicy_snow.IO.user_dates import get_input_dates
 
-# Provide bounding box (user popup or user-provided coordinates)
-area = bounding_box() # pop up for user to draw
-area = bounding_box(lower_left, upper_left, upper_right, lower_right) # or provide coordinates
+import shapely
 
-# Provide output filename for netcdf
-output_netcdf = '/filepath/to/output.netcdf' # should this overwrite file?
+# Provide bounding box (EPSG:4326 user-provided coordinates)
+area = shapely.geometry.box(-115, 43, -114, 44)
 
-# Provide dates as tuple of strings
-dates = ("2019-12-01", "2020-04-01")
+# Get tuple of dates. Provided date is ending date and start date is always prior August 1st
+dates = get_input_dates("2020-04-01")
 
 # Function to actually get data, run processing, returns xarray dataset w/ daily time dimension
-s1_sd = get_s1_snow_depth(area, dates, output_netcdf) 
-# optional keyword ideas: resolution, overwrite, fitting parameters (A, B, C)
+s1_sd = get_s1_snow_depth(area, dates, work_dir = './idaho_retrieval/) 
+
+# work_dir will be created if not present 
+# optional keyword ideas: job_name, fitting parameters (A, B, C), exisiting_job_name, outfp
+# `outfp = './idaho_ret.nc` will output datset to netcdf
 
 # plot first day of 2020 to check data quality
 s1_sd.sel(time = "2020-01-01").plot()
+
+# save as pickle file
+# dump completed dataset to data directory
+with open('./idaho_retrieval/spicy_test.pkl', 'wb') as f:
+    pickle.dump(ds, f)
 ```
-
-## Proposed Directory Structure:
-
-- c-snow
-    - download
-        - s1_imgs.py
-            * s1_img_search(area: shapely geom, dates: pd_time_slice) -> pd dataframe : find dates and url of s1 overpasses and returns granule names
-                - https://hyp3-docs.asf.alaska.edu/using/sdk_api/
-                - https://nbviewer.org/github/ASFHyP3/hyp3-sdk/blob/main/docs/sdk_example.ipynb
-            * download_s1_imgs(urls: pd dataframe) -> xarray : takes granule names of s1 images and download them and return xarray dataset of s1 images
-        - ancillary_data.py
-            * snow_cover_search(area: shapely geom, dates: (string, string)) -> pd dataframe : find url of IMS snow on/off images
-            * download_snow_cover_imgs(urls: pd dataframe, s1_dataset: xarray dataset) -> xarray : takes urls of IMS snow on/off images and download them and adds to the sentinel 1 xarray dataset as a variable/band
-            * fcf_search(area: shapely geom, dates: (string, string)) -> pd dataframe : find url of PROBA-V forest cover fraction images
-            * download_fcf_imgs(urls: pd dataframe, s1_dataset: xarray dataset) -> xarray : takesPROBA-V forest cover fraction images and download them and adds to the sentinel 1 xarray dataset as a variable/band
-    - constants
-        - CONSTANTS.py - constants to be used (resolution standards, band/variable names, etc)
-    - utils - function to be used in multiple places
-        - download_utils.py
-        - radar_utils.py
-        - c_snow_exceptions.py
-    - processing
-        - preprocessing.py
-            * s1_orbit_averaging(s1_ds: xarray dataset) -> s1_ds : do the mean averaging to allow for different orbits to be compared
-            * s1_clip_outliers(s1_ds: xarray dataset) -> s1_ds : clip outliers 3dB above or below 90th percentile
-            * calc_d_gamma_cr(s1_ds: xarray dataset) -> s1_ds: calculate d_gamma_cr using s1 images and FCF
-            * calc_d_gamma_VV(s1_ds: xarray dataset) -> s1_ds: calculate d_gamma_vv using s1 images and FCF
-            * calc_d_gamma(s1_ds: xarray dataset) -> s1_ds: calculate d_gamma using d_gamma_cr and d_gamma_vv
-        - snow_index.py
-            * calc_snow_index(s1_ds: xarray dataset) -> s1_ds: calculate snow index using d_gamma, wet snow mask and IMS snowon/snowoff
-        - wet_snow_mask.py
-            * find_wet_snow(s1_ds: xarray dataset) -> s1_ds : find pixels that have either dried (+2dB) or wetted (-2 dB)
-            * update_wet_snow(s1_ds: xarray dataset) -> s1_ds : set wet snow mask pixels as wet or dry based on previous time step's classification and threshold change
-        - get_s1_snowdepth.py
-            * calc_snow_depth(s1_ds: xarray dataset) -> s1_ds : final step using snow index and wet snow mask to calculate snow depths 
-    - IO
-        - user_input.py
-            * get_user_geometry(coordinates: (float, float, float, float)) -> shapely geom : take coordinates from user function call and return shapely geometry w/ error checking
-            * get_user_dates(dates: (string, string) -> pd_time_slice : take user input and convert to pandas date/time slice in days w/ error checking
-            * get_user_filepath(filepath: string) -> get the filepath to save output at w/ error checking
-        - netcdf_export.py
-            * save_netcdf(output_fp : string, s1_ds: xarray dataset) -> None : take final s1 dataset and save out variable for retrieved snow depth
-- notebooks
-    - basic_example.ipynb
-- tests
-    - test_data
-        - expected_output_dataset.pkl
-        - expected_input_dataset.pkl
-    - test_downloads.py
-    - test_inputs.py
-    - test_processing.py
-    - test_outputs.py
-- images
-    - cover_img.png
-    - example_output.png
-- README.md
-- environment.yml
-- LICENSE
-- .gitignore
 
 ## Contributing
 

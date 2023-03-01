@@ -143,3 +143,7 @@ data/*
 
 #data directory
 data/
+
+# include all netcdf files in the SnowEx-Data file!
+# This will override the other rules excluding netcdf files.
+#!SnowEx-Data/*.nc
