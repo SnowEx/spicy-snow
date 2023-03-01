@@ -277,15 +277,15 @@ def s1_incidence_angle_masking(dataset: xr.Dataset, inplace: bool = False) -> xr
 
     # Mask pixels with incidence angle > 70 degrees
     for band in ['inc']:
-            data = dataset['s1'].sel(band=band)
+        data = dataset['s1'].sel(band=band)
+        # Convert 'inc' from radians to degrees
+        data_deg = data * 180/(np.pi)
 
-            # Mask array ('inc' <= 0.7)
-            data_masked = data.where(data <= 0.7)
-
-            dataset['s1'].loc[dict(band = band)] = data_masked
+        # Mask array ('inc' <= 0.7)
+        dataset['s1'].loc[dict(band = band)] = data_deg.where(data_deg <= 0.7)
 
     if not inplace:
-            return dataset
+        return dataset`
 
 def merge_s1_subsets(dataset: Dict[str, xr.Dataset]) -> xr.Dataset:
     """
