@@ -288,11 +288,12 @@ def s1_incidence_angle_masking(dataset: xr.Dataset, inplace: bool = False) -> xr
     dataset: Xarray Dataset of sentinel images with incidence angles > 70 degrees
     masked
     """
-
+    
     # Check inplace flag
     if not inplace:
             dataset = dataset.copy(deep=True)
 
+    # Mask pixels with incidence angle > 70 degrees
     dataset['s1'] = dataset['s1'].where(dataset['s1'].sel(band = 'inc') < np.deg2rad(70))
 
     if not inplace:
