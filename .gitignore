@@ -147,3 +147,8 @@ data/
 # include all netcdf files in the SnowEx-Data file!
 # This will override the other rules excluding netcdf files.
 #!SnowEx-Data/*.nc
+<<<<<<< HEAD
+=======
+
+HL_codes_data/
+>>>>>>> 74e7e0d466ab074705a2b42221871afb7491caf2
