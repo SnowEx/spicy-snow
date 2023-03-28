@@ -51,6 +51,10 @@ def download_fcf(dataset: xr.Dataset, out_fp: str) -> xr.Dataset:
     
     assert fcf.max() <= 1, "Forest cover fraction must be bounded 0-1"
     assert fcf.min() >= 0, "Forest cover fraction must be bounded 0-1"
+
+    log.debug(f'FCF min: {fcf.min()}')
+    log.debug(f'FCF max: {fcf.max()}')
+    log.debug(f'FCF mean: {fcf.mean()}')
     
     # merge FCF and name it 'fcf' as a data variable
     dataset = xr.merge([dataset, fcf.rename('fcf')])
