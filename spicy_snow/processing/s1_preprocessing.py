@@ -99,10 +99,9 @@ def merge_s1_times(dataset: xr.Dataset, times: List[np.datetime64], verbose: boo
         nodata_value = 0
     else:
         nodata_value = np.nan
-    merged = merge_arrays(das, crs = 'EPSG:4326', nodata= nodata_value)
+    merged = merge_arrays(das, crs = 'EPSG:4326', nodata = nodata_value)
     dataset = dataset.drop_sel(time = times[1:])
     dataset['s1'].loc[dict(time = times[0])] = merged.values
-    times = []
 
     return dataset
 

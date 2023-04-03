@@ -90,7 +90,7 @@ def hyp3_pipeline(search_results: pd.DataFrame, job_name, existing_job_name: Uni
         # prompt for password
         hyp3 = sdk.HyP3(prompt = True)
 
-    # if existing job name provided then don't submit and simply watch existing jobs.
+    # if existing job name exists then don't submit and simply watch existing jobs.
     while existing_job_name:
         log.debug(f"existing name provided {existing_job_name}.")
         rtc_jobs = hyp3.find_jobs(name = existing_job_name)
@@ -213,7 +213,10 @@ def download_hyp3(jobs: sdk.jobs.Batch, area: shapely.geometry.Polygon, outdir: 
             img = img.rio.reproject('EPSG:4326')
 
             # clip to user specified area
-            img = img.rio.clip([area], 'EPSG:4326')
+            img = img.rio.clip_box(*area.bounds)
+
+            # pad to area
+            img = img.rio.pad_box(*area.bounds)
 
             # create band name
             band_name = name.replace(f'{granule}_', '')
