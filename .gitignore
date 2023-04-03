@@ -138,7 +138,7 @@ data/*
 *.zip
 *.gz
 *.asc
-*.nc
+# *.nc
 *.tif
 
 #data directory
