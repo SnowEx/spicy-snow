@@ -55,6 +55,9 @@ for f in files:
     rmse_no_flag = xr.DataArray(np.empty((len(A), len(B), len(C))) * np.nan,
                         coords = (A, B, C), dims = ('A','B','C'))
     
+    if Path(f'rmse_insitu/{ds_name}_wet_flag.nc').exists():
+        continue
+
     # Brute-force processing loop
     for a in A:
         print(f'A: {a}')
@@ -92,10 +95,11 @@ for f in files:
                             insitu_loc.loc[i, 'spicy'] = ds_ts.mean(dim = 'time')['snow_depth'].sel(x = slice(r.geometry.x - tol, r.geometry.x + tol), y = slice(r.geometry.y + tol, r.geometry.y - tol)).mean() * 100
                             insitu_loc.loc[i, 'wet'] = ds_ts.isel(time = 0)['wet_snow'].sel(x = r.geometry.x, y = r.geometry.y, method = 'nearest')
 
+                insitu_loc = insitu_loc.dropna(subset = ['depth', 'spicy'])
                 r, rmse, n = get_stats(insitu_loc)
                 rmse_no_flag.loc[a, b, c] = rmse
 
-                wet_insitu = insitu_loc[insitu_loc.wet != 1]
+                wet_insitu = insitu_loc[insitu_loc.wet == 0]
                 if len(wet_insitu) > 1:
                     r_wet, rmse_wet, n_wet = get_stats(wet_insitu)
                 else:
