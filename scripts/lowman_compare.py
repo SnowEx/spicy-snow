@@ -22,12 +22,13 @@ area = shapely.geometry.box(-117, 43, -113, 46)
 os.makedirs(Path('~/scratch/spicy-lowman/').expanduser(), exist_ok = True)
 out_nc = Path('~/scratch/spicy-lowman/spicy-lowman.nc').expanduser()
 
-dates = get_input_dates('2021-04-01')
+dates = get_input_dates('2021-04-01') #2021-04-01
 
 spicy_ds = retrieve_snow_depth(area = area, dates = dates, 
                                work_dir = Path('~/scratch/spicy-lowman/data/').expanduser(), 
-                               job_name = f'spicy-lowman-v1', 
-                               existing_job_name = 'spicy-lowman-v1',
-                               debug=False)
+                               job_name = f'spicy-lowman-v1', # v1
+                               existing_job_name = 'spicy-lowman-v1', # v1
+                               debug=False,
+                               outfp=out_nc)
         
 spicy_ds.to_netcdf(out_nc)
