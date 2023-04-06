@@ -96,7 +96,11 @@ for f in files:
                             insitu_loc.loc[i, 'wet'] = ds_ts.isel(time = 0)['wet_snow'].sel(x = r.geometry.x, y = r.geometry.y, method = 'nearest')
 
                 insitu_loc = insitu_loc.dropna(subset = ['depth', 'spicy'])
-                r, rmse, n = get_stats(insitu_loc)
+                
+                if len(insitu_loc) > 2:
+                    r, rmse, n = get_stats(insitu_loc)
+                else:
+                    rmse = np.nan
                 rmse_no_flag.loc[a, b, c] = rmse
 
                 wet_insitu = insitu_loc[insitu_loc.wet == 0]
