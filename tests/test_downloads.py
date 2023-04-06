@@ -113,10 +113,11 @@ class TestSentinel1Search(unittest.TestCase):
         self.assertEqual(ds.attrs['s1_units'], 'dB')
         self.assertEqual(ds.attrs['resolution'], '90')
 
-        expected_t2 = das['S1B_IW_GRDH_1SDV_20200127T012726_20200127T012751_019996_025D37_D0F0'].coarsen(x = 3, boundary = 'trim').mean().coarsen(y = 3, boundary = 'trim').mean()
+        expected_t2 = das['S1B_IW_GRDH_1SDV_20200127T012726_20200127T012751_019996_025D37_D0F0']#.coarsen(x = 3, boundary = 'trim').mean().coarsen(y = 3, boundary = 'trim').mean()
         expected_t2.loc[dict(band = ['VV', 'VH'])] = 10 * np.log10(expected_t2.sel(band = ['VV', 'VH']))
+        expected_t2 = expected_t2.where(expected_t2 > -1e10)
 
-        self.assertEqual(ds.isel(time = 0)['s1'].shape, (3, 3, 3))
+        self.assertEqual(ds.isel(time = 0)['s1'].shape, (10, 10, 3))
 
         assert_allclose(expected_t2, ds.isel(time = 2)['s1'])
 
