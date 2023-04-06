@@ -64,77 +64,54 @@ class TestSentinel1PreProcessing(unittest.TestCase):
         amp = ds_amp['s1'].isel(time = 0).sel(band = 'VV').values.ravel()
 
         assert(np.allclose(amp, amp_original))
-
-    def test_same_orbit_merge_zeros(self):
-        """
-        Tests whether two images with close time stamps (< 10 min) will be combined
-        to form 1 image from split images on arbitrary lines.
-        """
-        with open('./tests/test_data/2_img_ds', 'rb') as f:
-            ds = pickle.load(f)
-
-        img_old = ds.isel(time = 0).sel(band = 'VV')['s1']
-        img1 = img_old.copy(deep = True)
-        img2 = img_old.copy(deep = True)
-        img3 = img_old.copy(deep = True)
-        future = ds.isel(time = 0)['time'] + pd.Timedelta('10 seconds')
-        # cut arbitrary slices as 0
-        img1[:10, :] = 0
-        img2[10:50, :] = 0
-        img3[50:, :] = 0
-        # make 1 image more than 10 minutes away and add to Datarray
-        img4 = ds.isel(time = 1).sel(band = 'VV')['s1']
-        # make two future dates within 10 seconds of eachother
-        future1 = ds.isel(time = 0)['time'] + pd.Timedelta('10 seconds')
-        img2['time'] = future1
-        future2 = future1 + pd.Timedelta('10 seconds')
-        img3['time'] = future2
-        # concatenate sliced images on time dimension
-        ds = xr.concat([img1, img2, img3, img4], dim = 'time')
-        ds = ds.to_dataset()
-        # run merge and ensure merged image is created
-        ds1 = merge_partial_s1_images(ds)
-        # assert we only have 1 time stamp left (combined image)
-        assert(len(ds1.time) == 2)
-        # assert newly created time is 1st timestamp
-        assert(ds1.isel(time = 0).time == ds.isel(time = 0).time)
-        # assert new merged image is same as pre-sliced image
-        assert(np.allclose(ds1.isel(time = 0)['s1'], img_old))
     
-    def test_same_orbit_merge_nans(self):
-        """
-        Tests whether two images with close time stamps (< 10 min) will be combined
-        to form 1 image from split images on arbitrary lines.
-        """
-        with open('./tests/test_data/2_img_ds', 'rb') as f:
-            ds = pickle.load(f)
+    def test_s1_partial_image_merge(self):
 
-        img_old = ds.isel(time = 0).sel(band = 'VV')['s1']
-        img1 = img_old.copy(deep = True)
-        img2 = img_old.copy(deep = True)
-        img3 = img_old.copy(deep = True)
-        img4 = ds.isel(time = 1).sel(band = 'VV')['s1']
-        # cut arbitrary slices as 0
-        img1[:10, :] = np.nan
-        img2[10:50, :] = np.nan
-        img3[50:, :] = np.nan
-        # make two future dates within 10 seconds of eachother
-        future1 = ds.isel(time = 0)['time'] + pd.Timedelta('10 seconds')
-        img2['time'] = future1
-        future2 = future1 + pd.Timedelta('10 seconds')
-        img3['time'] = future2
-        # concatenate sliced images on time dimension
-        ds = xr.concat([img1, img2, img3, img4], dim = 'time')
-        ds = ds.to_dataset()
-        # run merge and ensure merged image is created
-        ds1 = merge_partial_s1_images(ds)
-        # assert we only have 1 time stamp left (combined image)
-        assert(len(ds1.time) == 2)
-        # assert newly created time is 1st timestamp
-        assert(ds1.isel(time = 0).time == ds.isel(time = 0).time)
-        # assert new merged image is same as pre-sliced image
-        assert(np.allclose(ds1.isel(time = 0)['s1'], img_old))
-    
+        backscatter = np.random.randn(10, 10, 25, 3)
+
+        # make some np nan cuts out of backscatter images
+        backscatter[:3, :, 0, :] = np.nan
+        backscatter[3:, :, 1, :] = np.nan
+
+        backscatter[:3, :, 2, :] = np.nan
+        backscatter[3:7, :, 3, :] = np.nan
+        backscatter[7:, :, 4, :] = np.nan
+
+
+        times = [np.datetime64(t) for t in ['2020-01-01T00:00','2020-01-01T00:10','2020-01-02T10:10', '2020-01-02T10:20', '2020-01-02T10:40']]
+        times_full = []
+        [times_full.extend([t + pd.Timedelta(f'{i} days') for t in times]) for i in range(0, 5 * 12, 12)]
+        orbits = np.tile(np.array([24, 24, 65, 65, 65]), reps = 5)
+        x = np.linspace(0, 9, 10)
+        y = np.linspace(10, 19, 10)
+        lon, lat = np.meshgrid(x, y)
+
+        test_ds = xr.Dataset(
+            data_vars = dict(
+                s1 = (["x", "y", "time", "band"], backscatter),
+            ),
+
+            coords = dict(
+                x = (["x"], x),
+                y = (["y"], y),
+                band = ['VV', 'VH', 'inc'],
+                time = times_full,
+                relative_orbit = (["time"], orbits)))
+        
+        assert np.sum(np.isnan(test_ds.isel(time = 0).sel(band = 'VV')['s1'])) == 30
+        assert np.sum(np.isnan(test_ds.isel(time = 1).sel(band = 'VV')['s1'])) == 70
+        assert np.sum(np.isnan(test_ds.isel(time = 2).sel(band = 'VV')['s1'])) == 30
+
+        assert test_ds.time.size == 25
+
+        merged = merge_partial_s1_images(test_ds)
+
+        for band in ['VV','VH','inc']:
+            assert np.sum(np.isnan(merged['s1'].isel(time = 0).sel(band = band))) == 0
+            assert np.sum(np.isnan(merged['s1'].isel(time = 1).sel(band = band))) == 0
+
+            assert merged.time.size == 10
+
     def test_outlier_clip(self):
         """
         Tests whether outliers 10th percentile - 3dB and 90th percentile + 3db

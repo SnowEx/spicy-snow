@@ -75,71 +75,66 @@ def s1_dB_to_power(dataset: xr.Dataset, inplace: bool = False):
     if not inplace:
         return dataset
 
-def merge_s1_times(dataset: xr.Dataset, times: List[np.datetime64], verbose: bool = False) -> xr.Dataset:
-    """
-    Merge sentinel-1 times into a single timestamp using first time of list times
 
-    Args:
-    dataset: Xarray Dataset with Sentinel 1 images
-    times: list of times to combine
-    verbose: print out times to be combined?
-
-    Return:
-    Xarray dataset: Xarray Dataset with sentinel-1 images with times combined into one
-    """
-
-    # make list of DataArrays at each time step in times
-    das = [dataset.sel(time = ts)['s1'] for ts in times]
-
-    # check all images are same relative_orbit? 
-    assert len(das) == len([d for d in das if d['relative_orbit'] == das[0]['relative_orbit']]), \
-        "All images not of same relative orbit."
-    
-    if das[0].where(das[0] == 0).notnull().sum() > 0:
-        nodata_value = 0
-    else:
-        nodata_value = np.nan
-    merged = merge_arrays(das, crs = 'EPSG:4326', nodata = nodata_value)
-    dataset = dataset.drop_sel(time = times[1:])
-    dataset['s1'].loc[dict(time = times[0])] = merged.values
-
-    return dataset
-
-def merge_partial_s1_images(dataset: xr.Dataset) -> xr.Dataset:
+def merge_partial_s1_images(dataset, inplace: bool = False) -> xr.Dataset:
     """
     Merges s1 images that have been split by hyp3 into a single image with the 
     first time stamp of that relative orbit pass as the time index.
 
     Args:
     dataset: Xarray Dataset with Sentinel 1 images that have been arbitrarily
-    split by hyp3
+    split by hyp3 into an arbitrary number of subswaths
 
     Return:
     dataset: Xarray Dataset with Sentinel 1 images combined into single images and
-    few time steps
+    only the first subswath's time step
     """
-    times = []
-    for ts in dataset.time.values:
-        
-        if not times:
-            times.append(ts)
-            continue
-
-        if abs(ts - times[0]) > pd.Timedelta('1 minute'):
-            if len(times) == 1:
-                times = [ts]
-                continue
-            else:
-                dataset = merge_s1_times(dataset, times)
-                times = []
-        else:
-            times.append(ts)
-        
-        if ts == dataset.time.values[-1] and len(times) > 1:
-            dataset = merge_s1_times(dataset, times)
-            times = []
+    if not inplace:
+        dataset = dataset.copy(deep=True)
     
-    return dataset
+    # split out each relative orbit and make its own dataset
+    for orbit_num, orbit_ds in dataset.groupby('relative_orbit'):
+
+        # find out how much each image is shifted form its neighbor
+        neighbor_shift = pd.to_timedelta(orbit_ds.time - orbit_ds.time.shift({'time':1}))
+
+        # capture those that are too close to their neighbor
+        split_idx = neighbor_shift < pd.Timedelta('1 hour')
+
+        # first value is an nan but we know it will be kept
+        split_idx[0] = False
+
+        # calculate the number of partial images we have per pass
+        extra_number = int(np.nansum(split_idx) / np.nansum(~split_idx))
+
+        # get the times to keep and remove from our full dataset
+        times_to_keep = orbit_ds.time[::extra_number + 1]
+        times_to_remove = orbit_ds.time[np.mod(np.arange(orbit_ds.time.size), extra_number + 1) != 0]
+
+        # these are the time shifts that each time to remove should be moved by to match the first image acquistion
+        time_shift = times_to_remove.data - np.repeat(times_to_keep.data, repeats = extra_number)
+
+        # now for each subswath of the full image lets combine it with the first image
+        for i in range(extra_number):
+
+            # snag this subswatch to be combined
+            extra_slices = orbit_ds.sel(time = times_to_remove[i::extra_number])
+
+            # shift our times to match the first acquisition timing
+            extra_slices = extra_slices.assign_coords({'time' : extra_slices.time - time_shift[i::extra_number]})
+
+            # set dataset images to a combination filling holes (nans) in the dataset with our extras
+            dataset.loc[{'time' : times_to_keep}] = dataset.sel(time = times_to_keep).combine_first(extra_slices)
+        
+        # drop all the times we just combined in
+        dataset = dataset.drop_sel(time = times_to_remove)
+
+    # can leave some outliers in the dataset along the edges so remove unreasonable values
+    dataset['s1'] = dataset['s1'].where(dataset['s1'] < 100)
+    dataset['s1'] = dataset['s1'].where(dataset['s1'] > -1e30)
+
+    if not inplace:
+        return dataset
 
 def subset_s1_images(dataset: xr.Dataset) -> Dict[str, xr.Dataset]:
     """
