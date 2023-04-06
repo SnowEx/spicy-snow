@@ -133,10 +133,8 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
     ds = flag_wet_snow(ds)
 
     if outfp:
-
-        if outfp.split('.')[-1] != 'nc':
-            outfp = outfp + '.nc'
-            
+        outfp = str(outfp)
+        
         ds.to_netcdf(outfp)
 
     return ds

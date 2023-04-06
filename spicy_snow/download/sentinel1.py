@@ -215,7 +215,7 @@ def download_hyp3(jobs: sdk.jobs.Batch, area: shapely.geometry.Polygon, outdir: 
             # clip to user specified area
             img = img.rio.clip_box(*area.bounds)
 
-            # pad to area
+            # pad to user specified area
             img = img.rio.pad_box(*area.bounds)
 
             # create band name
@@ -229,6 +229,9 @@ def download_hyp3(jobs: sdk.jobs.Batch, area: shapely.geometry.Polygon, outdir: 
 
         # concat VV, VH, and inc into one xarray DataArray
         da = xr.concat(imgs, dim = 'band')
+
+        # coarsen to correct resolution (90 m)
+        da = da.coarsen(x = 3, boundary = 'trim').mean().coarsen(y = 3, boundary = 'trim').mean()
 
         # we need to reproject each image to match the first image to make CRSs work
         if dataArrays:
@@ -295,7 +298,7 @@ def combine_s1_images(dataArrays: Dict[str, xr.DataArray]) -> xr.Dataset:
     # resolution set to 90m:
     # must do in linear space not logarithmic dBs
     assert s1_dataset['s1'].sel(band = ['VV', 'VH']).min() >= 0
-    s1_dataset = s1_dataset.coarsen(x = 3, boundary = 'trim').mean().coarsen(y = 3, boundary = 'trim').mean()
+    # s1_dataset = s1_dataset.coarsen(x = 3, boundary = 'trim').mean().coarsen(y = 3, boundary = 'trim').mean()
     s1_dataset.attrs['resolution'] = '90'
 
     # ensure time dimension is sorted
