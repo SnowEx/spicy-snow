@@ -28,11 +28,16 @@ from itertools import product
 for lon_min, lat_min in product(range(-117, -113), range(43, 46)):
     area = shapely.geometry.box(lon_min, lat_min, lon_min + 1, lat_min + 1)
     out_nc = Path(f'~/scratch/spicy-lowman-quadrant/spicy-lowman_{lon_min}-{lon_min + 1}_{lat_min}-{lat_min + 1}.nc').expanduser()
-    spicy_ds = retrieve_snow_depth(area = area, dates = dates, 
-                                work_dir = Path('~/scratch/spicy-lowman-quadrant/data/').expanduser(), 
-                                job_name = f'spicy-lowman-{lon_min}-{lon_min + 1}_{lat_min}-{lat_min + 1}', # v1
-                                existing_job_name = f'spicy-lowman-{lon_min}-{lon_min + 1}_{lat_min}-{lat_min + 1}', # v1
-                                debug=False,
-                                outfp=out_nc)
-            
-    spicy_ds.to_netcdf(out_nc)
+    if out_nc.exists():
+        continue
+    try:
+        spicy_ds = retrieve_snow_depth(area = area, dates = dates, 
+                                    work_dir = Path('~/scratch/spicy-lowman-quadrant/data/').expanduser(), 
+                                    job_name = f'spicy-lowman-{lon_min}-{lon_min + 1}_{lat_min}-{lat_min + 1}', # v1
+                                    existing_job_name = f'spicy-lowman-{lon_min}-{lon_min + 1}_{lat_min}-{lat_min + 1}', # v1
+                                    debug=False,
+                                    outfp=out_nc)
+        spicy_ds.to_netcdf(out_nc)
+    except Exception as e:
+        print(e)
+        print(f'Failed! On {out_nc}')

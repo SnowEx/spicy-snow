@@ -186,7 +186,7 @@ def find_repeat_interval(dataset: xr.Dataset) -> pd.Timedelta:
     orbit_times = dataset.sel(time = dataset.relative_orbit == dataset['relative_orbit'][0]).time.diff(dim = 'time').values
     repeat = np.nanmedian([pd.Timedelta(i).round('D') for i in orbit_times]).round('D')
 
-    assert repeat.days % 6 == 0, "Calculated repeat interval is not multiple of 6 days."
+    assert repeat.days % 6 == 0, f"Calculated repeat interval, {repeat}, is not multiple of 6 days."
 
     return repeat
 
