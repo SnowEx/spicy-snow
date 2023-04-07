@@ -154,3 +154,5 @@ HL_codes_data/
 slurms/
 logs/
 Lidar_s1_stacks/
+
+scripts/optimize/param_sds

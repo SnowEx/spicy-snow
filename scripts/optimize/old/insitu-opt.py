@@ -28,10 +28,6 @@ A = np.arange(1, 3.1, 0.5)
 B = np.arange(0, 1.01, 0.1)
 C = np.arange(0, 1.001, 0.01)
 
-df = pd.read_csv('../../SnowEx-Data/snowex_depths.csv', index_col = 0)
-df.loc[:, 'geometry'] = df['geometry'].apply(wkt.loads)
-insitu = gpd.GeoDataFrame(df, crs = 'epsg:4326')
-
 files = Path('../../Lidar_s1_stacks/').glob('*.nc')
 for f in files:
 
@@ -41,19 +37,9 @@ for f in files:
     ds_ = xr.open_dataset(f).load()
     dataset = ds_[['s1','deltaVV','ims','fcf','lidar-sd']]
 
-    # get only insitu depths in spicy bounding box
-    bbox = box(*dataset.rio.bounds())
-    insitu_loc_orig = gpd.clip(insitu, mask = bbox).copy()
-
     # find closest timestep to lidar
     td = abs(pd.to_datetime(dataset.time) - pd.to_datetime(dataset.attrs['lidar-flight-time']))
     closest_ts = dataset.time[np.argmin(td)]
-
-    # Initialize RMSE arrays
-    rmse_wet_flag = xr.DataArray(np.empty((len(A), len(B), len(C))) * np.nan,
-                        coords = (A, B, C), dims = ('A','B','C'))
-    rmse_no_flag = xr.DataArray(np.empty((len(A), len(B), len(C))) * np.nan,
-                        coords = (A, B, C), dims = ('A','B','C'))
     
     if Path(f'rmse_insitu/{ds_name}_wet_flag.nc').exists():
         continue
@@ -72,7 +58,6 @@ for f in files:
             ds = id_newly_frozen_snow(ds)
             ds = flag_wet_snow(ds)
             for c in C:
-                insitu_loc = insitu_loc_orig.copy()
                 print(f'        c: {c}')
                 # print(f'A={a}; B={b}; C={c}')
 
