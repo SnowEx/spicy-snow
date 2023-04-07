@@ -139,3 +139,47 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
 
     return ds
 
+def retrieval_from_parameters(dataset: xr.Dataset, A: float, B: float, C: float):
+    """
+    Retrieve snow depth with varied parameter set from an already pre-processed
+    dataset.
+
+    Args:
+    dataset: Already preprocessed dataset with s1, fcf, ims, deltaVV, merged images, 
+    and masking applied.
+    A: A parameter
+    B: B parameter
+    C: C parameter
+
+    Returns:
+    dataset: xarray dataset with snow_depth variable calculated from parameters
+    """
+
+    dataset = dataset[['s1','deltaVV','ims','fcf','lidar-sd']]
+
+    # calculate delta CR and delta VV
+    dataset = calc_delta_cross_ratio(dataset, A = A)
+
+    # calculate delta gamma with delta CR and delta VV with FCF
+    dataset = calc_delta_gamma(dataset, B = B)
+
+    # clip outliers of delta gamma
+    dataset = clip_delta_gamma_outlier(dataset)
+
+    # calculate snow_index from delta_gamma
+    dataset = calc_snow_index(dataset)
+
+    # convert snow index to snow depth
+    dataset = calc_snow_index_to_snow_depth(dataset, C = C)
+
+    # find newly wet snow
+    dataset = id_newly_wet_snow(dataset)
+    dataset = id_wet_negative_si(dataset)
+
+    # find newly frozen snow
+    dataset = id_newly_frozen_snow(dataset)
+
+    # make wet_snow flag
+    dataset = flag_wet_snow(dataset)
+
+    return dataset
