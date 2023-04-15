@@ -130,8 +130,9 @@ def merge_partial_s1_images(dataset, inplace: bool = False) -> xr.Dataset:
         dataset = dataset.drop_sel(time = times_to_remove)
 
     # can leave some outliers in the dataset along the edges so remove unreasonable values
-    dataset['s1'] = dataset['s1'].where(dataset['s1'] < 100)
-    dataset['s1'] = dataset['s1'].where(dataset['s1'] > -1e30)
+    if 's1' in dataset.data_vars:
+        dataset['s1'] = dataset['s1'].where(dataset['s1'] < 100)
+        dataset['s1'] = dataset['s1'].where(dataset['s1'] > -1e30)
 
     if not inplace:
         return dataset
