@@ -37,7 +37,7 @@ for lon_min, lat_min in product(range(-117, -113), range(43, 46)):
                                     existing_job_name = f'spicy-lowman-{lon_min}-{lon_min + 1}_{lat_min}-{lat_min + 1}', # v1
                                     debug=False,
                                     outfp=out_nc)
-        spicy_ds.to_netcdf(out_nc)
+        # spicy_ds.to_netcdf(out_nc)
     except Exception as e:
         print(e)
         print(f'Failed! On {out_nc}')
