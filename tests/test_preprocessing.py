@@ -114,6 +114,10 @@ class TestSentinel1PreProcessing(unittest.TestCase):
         times_full = []
         [times_full.extend([t + pd.Timedelta(f'{i} days') for t in times]) for i in range(0, 5 * 12, 12)]
         orbits = np.tile(np.array([24, 24, 65, 65, 65]), reps = 5)
+
+        abs_orbits = [31191, 31191, 28888, 28888, 28888]
+        abs_full = []
+        [abs_full.extend([o + i for o in abs_orbits]) for i in range(0, 5 * 12, 12)]
         x = np.linspace(0, 9, 10)
         y = np.linspace(10, 19, 10)
         lon, lat = np.meshgrid(x, y)
@@ -128,7 +132,8 @@ class TestSentinel1PreProcessing(unittest.TestCase):
                 y = (["y"], y),
                 band = ['VV', 'VH', 'inc'],
                 time = times_full,
-                relative_orbit = (["time"], orbits)))
+                relative_orbit = (["time"], orbits),
+                absolute_orbit = (["time"], abs_full)))
         
         assert np.sum(np.isnan(test_ds.isel(time = 0).sel(band = 'VV')['s1'])) == 30
         assert np.sum(np.isnan(test_ds.isel(time = 1).sel(band = 'VV')['s1'])) == 70
@@ -142,7 +147,60 @@ class TestSentinel1PreProcessing(unittest.TestCase):
             assert np.sum(np.isnan(merged['s1'].isel(time = 0).sel(band = band))) == 0
             assert np.sum(np.isnan(merged['s1'].isel(time = 1).sel(band = band))) == 0
 
-            assert merged.time.size == 10
+            self.assertEqual(merged.time.size, 10)
+
+    def test_uneven_s1_partial_image_merge(self):
+
+        backscatter = np.random.randn(10, 10, 25, 3)
+
+        # make some np nan cuts out of backscatter images
+        for i in range(0, 25, 5):
+            backscatter[:3, :, i + 0, :] = np.nan
+            backscatter[3:, :, i + 1, :] = np.nan
+
+            backscatter[3:, :, i + 2, :] = np.nan
+            backscatter[:3, :, i + 3, :] = np.nan
+            backscatter[7:, :, i + 3, :] = np.nan
+            backscatter[:7, :, i + 4, :] = np.nan
+
+
+        times = [np.datetime64(t) for t in ['2020-01-01T00:00','2020-01-01T00:10','2020-01-02T10:10', '2020-01-02T10:20', '2020-01-02T10:40']]
+        times_full = []
+        [times_full.extend([t + pd.Timedelta(f'{i} days') for t in times]) for i in range(0, 5 * 12, 12)]
+        orbits = np.tile(np.array([24, 24, 65, 65, 65]), reps = 5)
+
+        abs_orbits = [31191, 31191, 28888, 28888, 28888]
+        abs_full = []
+        [abs_full.extend([o + i for o in abs_orbits]) for i in range(0, 5 * 12, 12)]
+        x = np.linspace(0, 9, 10)
+        y = np.linspace(10, 19, 10)
+        lon, lat = np.meshgrid(x, y)
+
+        test_ds = xr.Dataset(
+            data_vars = dict(
+                s1 = (["x", "y", "time", "band"], backscatter),
+            ),
+
+            coords = dict(
+                x = (["x"], x),
+                y = (["y"], y),
+                band = ['VV', 'VH', 'inc'],
+                time = times_full,
+                relative_orbit = (["time"], orbits),
+                absolute_orbit = (["time"], abs_full)))
+
+        test_ds = test_ds.drop_isel(time = 0)
+        test_ds = test_ds.drop_isel(time = 3)
+
+        merged = merge_partial_s1_images(test_ds)
+
+        for band in ['VV','VH','inc']:
+            self.assertEqual(np.sum(np.isnan(merged['s1'].isel(time = 0).sel(band = band))), 70)
+            self.assertEqual(np.sum(np.isnan(merged['s1'].isel(time = 1).sel(band = band))), 30)
+            self.assertEqual(np.sum(np.isnan(merged['s1'].isel(time = 2).sel(band = band))), 0)
+            self.assertEqual(np.sum(np.isnan(merged['s1'].isel(time = 3).sel(band = band))), 0)
+
+            self.assertEqual(merged.time.size, 10)
 
     def test_outlier_clip(self):
         """
