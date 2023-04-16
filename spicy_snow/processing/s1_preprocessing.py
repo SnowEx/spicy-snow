@@ -95,39 +95,21 @@ def merge_partial_s1_images(dataset, inplace: bool = False) -> xr.Dataset:
     # split out each relative orbit and make its own dataset
     for orbit_num, orbit_ds in dataset.groupby('relative_orbit'):
 
-        # find out how much each image is shifted form its neighbor
-        neighbor_shift = pd.to_timedelta(orbit_ds.time - orbit_ds.time.shift({'time':1}))
+        # split out each absolute orbit and combine images
+        for absolute_num, abs_ds in orbit_ds.groupby('absolute_orbit'):
 
-        # capture those that are too close to their neighbor
-        split_idx = neighbor_shift < pd.Timedelta('1 hour')
+            # if only 1 image in this absolute orbit go to the next
+            if len(abs_ds.time) == 1:
+                continue
 
-        # first value is an nan but we know it will be kept
-        split_idx[0] = False
+            # combine all images into the first image time step
+            combo_imgs = abs_ds.mean(dim = 'time')
 
-        # calculate the number of partial images we have per pass
-        extra_number = int(np.nansum(split_idx) / np.nansum(~split_idx))
+            # set first image in dataset to this new combined image
+            dataset.loc[{'time' : abs_ds.isel(time = 0).time}] = combo_imgs
 
-        # get the times to keep and remove from our full dataset
-        times_to_keep = orbit_ds.time[::extra_number + 1]
-        times_to_remove = orbit_ds.time[np.mod(np.arange(orbit_ds.time.size), extra_number + 1) != 0]
-
-        # these are the time shifts that each time to remove should be moved by to match the first image acquistion
-        time_shift = times_to_remove.data - np.repeat(times_to_keep.data, repeats = extra_number)
-
-        # now for each subswath of the full image lets combine it with the first image
-        for i in range(extra_number):
-
-            # snag this subswatch to be combined
-            extra_slices = orbit_ds.sel(time = times_to_remove[i::extra_number])
-
-            # shift our times to match the first acquisition timing
-            extra_slices = extra_slices.assign_coords({'time' : extra_slices.time - time_shift[i::extra_number]})
-
-            # set dataset images to a combination filling holes (nans) in the dataset with our extras
-            dataset.loc[{'time' : times_to_keep}] = dataset.sel(time = times_to_keep).combine_first(extra_slices)
-        
-        # drop all the times we just combined in
-        dataset = dataset.drop_sel(time = times_to_remove)
+            # drop images that have been combined
+            dataset = dataset.drop_sel(time = abs_ds.isel(time = slice(1, len(abs_ds.time))).time)
 
     # can leave some outliers in the dataset along the edges so remove unreasonable values
     if 's1' in dataset.data_vars:
