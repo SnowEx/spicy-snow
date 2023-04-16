@@ -270,6 +270,9 @@ def combine_s1_images(dataArrays: Dict[str, xr.DataArray]) -> xr.Dataset:
         # set relative orbit 
         relative_orbit = granule_metadata.properties['pathNumber']
 
+        # set absolute orbit
+        absolute_orbit = granule_metadata.properties['orbit']
+
         # expand time dimension of DataArray from zero dimension (scalar) to 1d
         da = da.expand_dims(dim = {'time': 1})
 
@@ -285,6 +288,9 @@ def combine_s1_images(dataArrays: Dict[str, xr.DataArray]) -> xr.Dataset:
 
         # add relative orbit as indexable parameter
         da = da.assign_coords(relative_orbit = ('time', [relative_orbit]))
+
+        # add absolute orbit as indexable parameter
+        da = da.assign_coords(absolute_orbit = ('time', [absolute_orbit]))
         
         # append multi-band image to das list to concat into time-series DataArray
         das.append(da)
