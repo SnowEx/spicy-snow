@@ -18,19 +18,51 @@ class TestSnowIndex(unittest.TestCase):
     Test functionality of snow_index calculation functions
     """
 
+    @classmethod
+    def setUpTestDataset(self):
+        backscatter = np.random.randn(10, 10, 25, 3)
+        times = [np.datetime64(t) for t in ['2020-01-01T00:00','2020-01-01T00:10','2020-01-02T10:10', '2020-01-02T10:20', '2020-01-02T10:40']]
+        times_full = []
+        [times_full.extend([t + pd.Timedelta(f'{i} days') for t in times]) for i in range(0, 5 * 12, 12)]
+
+        orbits = np.tile(np.array([24, 24, 65, 65, 65]), reps = 5)
+        platforms = np.tile(np.array(['S1A', 'S1A', 'S1B', 'S1B', 'S1B']), reps = 5)
+        direction = np.tile(np.array(['descending', 'descending', 'ascending', 'ascending', 'ascending']), reps = 5)
+        x = np.linspace(0, 9, 10)
+        y = np.linspace(10, 19, 10)
+
+        test_ds = xr.Dataset(
+            data_vars = dict(
+                s1 = (["x", "y", "time", "band"], backscatter),
+            ),
+
+            coords = dict(
+                x = (["x"], x),
+                y = (["y"], y),
+                band = ['VV', 'VH', 'inc'],
+                time = times_full,
+                relative_orbit = (["time"], orbits),
+                platform = (["time"], platforms),
+                flight_dir = (["time"], direction)
+                ))
+
+        return test_ds
+    
     def test_delta_vv(self):
         """
         Test the calculation of change in VV between time steps of same
         relative orbit
         """
-        with open('./tests/test_data/2_img_ds', 'rb') as f:
-            ds = pickle.load(f)
-
-        da1, da2, da3 = ds['s1'].sel(band = 'VV')
+        test_ds = self.setUpTestDataset()
+        orbit_ds = test_ds.sel(time = test_ds.relative_orbit == 24)
+    
+        da1 = orbit_ds['s1'].sel(band = 'VV').isel(time = 0)
+        da2 = orbit_ds['s1'].sel(band = 'VV').isel(time = 1)
+        da3 = orbit_ds['s1'].sel(band = 'VV').isel(time = 2)
         real2_1_diff = da2 - da1
         real3_2_diff = da3 - da2
 
-        ds1 = calc_delta_VV(ds)
+        ds1 = calc_delta_VV(orbit_ds)
 
         assert_allclose(ds1['deltaVV'].isel(time = 1), real2_1_diff)
         
@@ -40,28 +72,29 @@ class TestSnowIndex(unittest.TestCase):
         """
         test that if units are amplitude calc_delta_vv raises AssertionErro
         """
-        with open('./tests/test_data/2_img_ds', 'rb') as f:
-            ds = pickle.load(f)
+        test_ds = self.setUpTestDataset()
         
-        ds.attrs['s1_units'] = 'amp'
+        test_ds.attrs['s1_units'] = 'amp'
 
-        self.assertRaises(AssertionError, calc_delta_VV, ds)
+        self.assertRaises(AssertionError, calc_delta_VV, test_ds)
     
-    def test_delta_cr(self):
         """
         Test the calculation of change in VV between time steps of same
         relative orbit
         """
-        with open('./tests/test_data/2_img_ds', 'rb') as f:
-            ds = pickle.load(f)
+        test_ds = self.setUpTestDataset()
+        orbit_ds = test_ds.sel(time = test_ds.relative_orbit == 24)
 
         test_A = 2
 
-        CR1, CR2, CR3 = ds['s1'].sel(band = 'VH') * test_A - ds['s1'].sel(band = 'VV')
+        CR_ds = orbit_ds['s1'].sel(band = 'VH') * test_A - orbit_ds['s1'].sel(band = 'VV')
+        CR1 = CR_ds.isel(time = 0)
+        CR2 = CR_ds.isel(time = 1)
+        CR3 = CR_ds.isel(time = 2)
         real2_1_diff = CR2 - CR1
         real3_2_diff = CR3 - CR2
 
-        ds1 = calc_delta_cross_ratio(ds, A = test_A)
+        ds1 = calc_delta_cross_ratio(orbit_ds, A = test_A)
 
         assert_allclose(ds1['deltaCR'].isel(time = 1), real2_1_diff)
         
@@ -71,12 +104,11 @@ class TestSnowIndex(unittest.TestCase):
         """
         test that if units are amplitude calc_delta_vv raises AssertionErro
         """
-        with open('./tests/test_data/2_img_ds', 'rb') as f:
-            ds = pickle.load(f)
+        test_ds = self.setUpTestDataset()
         
-        ds.attrs['s1_units'] = 'amp'
+        test_ds.attrs['s1_units'] = 'amp'
 
-        self.assertRaises(AssertionError, calc_delta_cross_ratio, ds)
+        self.assertRaises(AssertionError, calc_delta_cross_ratio, test_ds)
     
     def test_delta_gamma(self):
         backscatter = np.random.randn(10, 10, 4, 3)
