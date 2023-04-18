@@ -34,7 +34,7 @@ def calc_rmse(y_actual, y_pred):
     return rms
 
 if __name__ == '__main__':
-    
+    pass
 
 # def get_params(v_num):
 

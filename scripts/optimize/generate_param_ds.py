@@ -28,7 +28,6 @@ C = np.round(np.arange(0, 1.001, 0.01), 2)
 files = Path('../../Lidar_s1_stacks/').glob('*.nc')
 param_dir = Path('~/scratch/params').expanduser()
 for f in files:
-
     # get dataset
     ds_name = f.name.split('stacks/')[-1].split('.')[0]
     print(datetime.now(), f' -- starting {ds_name}')
@@ -92,7 +91,7 @@ param_dir = Path('~/scratch/params').expanduser()
 data_length = 0
 for loc_dir in param_dir.glob('*'):
     res = xr.open_dataset(param_dir.joinpath(f'{loc_dir.name}/{1.0}_{0.0}_{0.0}.nc'))
-    sd_actual, sd_pred = get_bootstrap(res['lidar-sd'], res['snow_depth'])
+    sd_actual, sd_pred = get_numpy(res['lidar-sd'], res['snow_depth'])
     data_length += len(sd_actual)
 
 param_dir = Path('~/scratch/params').expanduser()
