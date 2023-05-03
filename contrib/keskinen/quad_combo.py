@@ -32,7 +32,7 @@ for fp in quad_dir.glob('*.nc'):
     if '.un.nc' not in fp.name:
         ds = xr.open_dataset(fp)
         ds = ds['snow_depth']
-        ds = ds.sel(time = slice('2020-11-01', '2021-03-01'))
+        ds = ds.sel(time = slice('2020-12-01', '2021-04-01'))
         ds = ds.reindex(lat=list(reversed(ds.y)))
         ds = ds.reindex(lat=list(reversed(ds.x)))
         lon = fp.stem.split('_')[-2]
@@ -47,4 +47,4 @@ res = res.sortby('x')
 
 res = merge_partial_s1_images(res.to_dataset(name = 'snow_depth'))['snow_depth']
 
-res.to_netcdf(quad_dir.joinpath('combo_v2.nc'))
+res.to_netcdf(quad_dir.joinpath('combo_v3.nc'))
