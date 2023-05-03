@@ -50,37 +50,38 @@ Lievens et al 2021 - https://tc.copernicus.org/articles/16/159/2022/
 ## Example Installation
 
 ```sh
+# pip install to come! Please just add this directory to your path for now.
+# see https://stackoverflow.com/questions/32715261/how-to-add-folder-to-search-path-for-a-given-anaconda-environment
+# for instructions - be sure to conda install conda-build before running command.
 pip install c_snow
 ```
 
 ## Example usage:
 
 ```python
-from spicy_snow import retrieve_snow_depth
+from pathlib import Path
+
+# Add main repo to path if you haven't added with conda-develop
+# import sys
+# sys.path.append('path/to/the/spicy-snow/')
+
+from spicy_snow.retrieval import retrieve_snow_depth
 from spicy_snow.IO.user_dates import get_input_dates
 
-import shapely
+# change to your minimum longitude, min lat, max long, max lat
+area = shapely.geometry.box(-113.2, 43, -113, 43.4)
 
-# Provide bounding box (EPSG:4326 user-provided coordinates)
-area = shapely.geometry.box(-115, 43, -114, 44)
+out_nc = Path('~/Desktop/spicy-test/test.nc').expanduser()
 
-# Get tuple of dates. Provided date is ending date and start date is always prior August 1st
-dates = get_input_dates("2020-04-01")
+# this will generate a tuple of dates from the previous August 1st to this date
+dates = get_input_dates('2021-04-01') # run on all s1 images from (2020-08-01, 2021-04-01) in this example
 
-# Function to actually get data, run processing, returns xarray dataset w/ daily time dimension
-s1_sd = get_s1_snow_depth(area, dates, work_dir = './idaho_retrieval/) 
-
-# work_dir will be created if not present 
-# optional keyword ideas: job_name, fitting parameters (A, B, C), exisiting_job_name, outfp
-# `outfp = './idaho_ret.nc` will output datset to netcdf
-
-# plot first day of 2020 to check data quality
-s1_sd.sel(time = "2020-01-01").plot()
-
-# save as pickle file
-# dump completed dataset to data directory
-with open('./idaho_retrieval/spicy_test.pkl', 'wb') as f:
-    pickle.dump(ds, f)
+spicy_ds = retrieve_snow_depth(area = area, dates = dates, 
+                               work_dir = Path('~/Desktop/spicy-test/').expanduser(), 
+                               job_name = f'testing_spicy',
+                               existing_job_name = 'testing_spicy',
+                               debug=False,
+                               outfp=out_nc)
 ```
 
 ## Contributing
