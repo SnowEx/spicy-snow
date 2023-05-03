@@ -158,3 +158,5 @@ Lidar_s1_stacks/
 scripts/optimize/param_sds
 
 *.csv
+
+!/results/site_param_rmses/*.csv
