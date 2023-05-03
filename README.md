@@ -15,38 +15,6 @@ Lievens et al 2021 - https://tc.copernicus.org/articles/16/159/2022/
 
 <img src="https://github.com/SnowEx/spicy-snow/blob/main/title-img.png" width="800">
 
-## Proposed Roadmap
-
-- [x] Design planning
-- [x] Pseudo-code
-- [x] Logging system
-
-- [x] User Inputs: 
-    - [x] dates 
-    - [x] geographic area
-
-- [x] Data products to pull in:
-    - [x] Sentinel 1 - orbit file, border noise, thermal noise, radiometric calibration, terrain flattened, gamma_0, range dopper terrain correction, averaged to 100m, mask out incidence angles >70
-    - [x] Snow cover (0/1) - Interactive multisensor snow and ice mapping system
-    - [ ] Glacier cover from Randolph Glacier Inventory 6.0
-    - [x] Forest Cover Fraction from copernicus PROBA-V dataset
-    - [ ] Water cover from PROBA-V dataset
-
-- [x] Processing steps
-    - [x] Rescale by mean for all orbits to overall mean
-    - [x] Remove observations 3dB above 90th percentile or 3dB below 10th percentile
-    - [x] Calculate \triangle \gamma_{CR} and \triangle \gamma_{VV}
-    - [x] Calculate combined values \gamma
-    - [x] Calculate previous SI using weighted +- 5/11 days SI
-    - [x] Calculate SI and SD, uses snow cover from IMS too
-    - [x] Wet snow mask update based on -2dB or +2dB changes, negative SI
-    - [x] Coarsen to appropriate resolution
-
-- [x] Output: 
-    - [x] xarray netcdf of snow depths
-    
-- [x] Tests
-
 ## Example Installation
 
 ```sh
