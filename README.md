@@ -15,72 +15,63 @@ Lievens et al 2021 - https://tc.copernicus.org/articles/16/159/2022/
 
 <img src="https://github.com/SnowEx/spicy-snow/blob/main/title-img.png" width="800">
 
-## Proposed Roadmap
-
-- [x] Design planning
-- [x] Pseudo-code
-- [x] Logging system
-
-- [x] User Inputs: 
-    - [x] dates 
-    - [x] geographic area
-
-- [x] Data products to pull in:
-    - [x] Sentinel 1 - orbit file, border noise, thermal noise, radiometric calibration, terrain flattened, gamma_0, range dopper terrain correction, averaged to 100m, mask out incidence angles >70
-    - [x] Snow cover (0/1) - Interactive multisensor snow and ice mapping system
-    - [ ] Glacier cover from Randolph Glacier Inventory 6.0
-    - [x] Forest Cover Fraction from copernicus PROBA-V dataset
-    - [ ] Water cover from PROBA-V dataset
-
-- [x] Processing steps
-    - [x] Rescale by mean for all orbits to overall mean
-    - [x] Remove observations 3dB above 90th percentile or 3dB below 10th percentile
-    - [x] Calculate \triangle \gamma_{CR} and \triangle \gamma_{VV}
-    - [x] Calculate combined values \gamma
-    - [x] Calculate previous SI using weighted +- 5/11 days SI
-    - [x] Calculate SI and SD, uses snow cover from IMS too
-    - [x] Wet snow mask update based on -2dB or +2dB changes, negative SI
-    - [x] Coarsen to appropriate resolution
-
-- [x] Output: 
-    - [x] xarray netcdf of snow depths
-    
-- [x] Tests
-
 ## Example Installation
 
 ```sh
+# pip install to come! Please just add this directory to your path for now.
+# see https://stackoverflow.com/questions/32715261/how-to-add-folder-to-search-path-for-a-given-anaconda-environment
+# for instructions - be sure to conda install conda-build before running command.
 pip install c_snow
 ```
 
 ## Example usage:
 
 ```python
-from spicy_snow import retrieve_snow_depth
+from pathlib import Path
+
+# Add main repo to path if you haven't added with conda-develop
+# import sys
+# sys.path.append('path/to/the/spicy-snow/')
+
+from spicy_snow.retrieval import retrieve_snow_depth
 from spicy_snow.IO.user_dates import get_input_dates
 
-import shapely
+# change to your minimum longitude, min lat, max long, max lat
+area = shapely.geometry.box(-113.2, 43, -113, 43.4)
 
-# Provide bounding box (EPSG:4326 user-provided coordinates)
-area = shapely.geometry.box(-115, 43, -114, 44)
+out_nc = Path('~/Desktop/spicy-test/test.nc').expanduser()
 
-# Get tuple of dates. Provided date is ending date and start date is always prior August 1st
-dates = get_input_dates("2020-04-01")
+# this will generate a tuple of dates from the previous August 1st to this date
+dates = get_input_dates('2021-04-01') # run on all s1 images from (2020-08-01, 2021-04-01) in this example
 
-# Function to actually get data, run processing, returns xarray dataset w/ daily time dimension
-s1_sd = get_s1_snow_depth(area, dates, work_dir = './idaho_retrieval/) 
+spicy_ds = retrieve_snow_depth(area = area, dates = dates, 
+                               work_dir = Path('~/Desktop/spicy-test/').expanduser(), 
+                               job_name = f'testing_spicy',
+                               existing_job_name = 'testing_spicy',
+                               debug=False,
+                               outfp=out_nc)
+```
 
-# work_dir will be created if not present 
-# optional keyword ideas: job_name, fitting parameters (A, B, C), exisiting_job_name, outfp
-# `outfp = './idaho_ret.nc` will output datset to netcdf
+### Running over large areas/memory issues
 
-# plot first day of 2020 to check data quality
-s1_sd.sel(time = "2020-01-01").plot()
+If you are running out of memory or running over multiple degrees of latitude this code snippet should get you started on batch processing swathes.
 
-# save as pickle file
-# dump completed dataset to data directory
-with open('./idaho_retrieval/spicy_test.pkl', 'wb') as f:
-    pickle.dump(ds, f)
+```python
+from shapely import geometry
+from itertools import product
+for lon_min, lat_min in product(range(-117, -113), range(43, 46)):
+    area = shapely.geometry.box(lon_min, lat_min, lon_min + 1, lat_min + 1)
+    out_nc = Path(f'~/Desktop/spicy-test/swath_{lon_min}-{lon_min + 1}_{lat_min}-{lat_min + 1}.nc').expanduser()
+    if out_nc.exists():
+        continue
+
+    spicy_ds = retrieve_snow_depth(area = area, dates = dates, 
+                                work_dir = Path('~/scratch/spicy-lowman-quadrant/data/').expanduser(), 
+                                job_name = f'spicy-lowman-{lon_min}-{lon_min + 1}_{lat_min}-{lat_min + 1}', # v1
+                                existing_job_name = f'spicy-lowman-{lon_min}-{lon_min + 1}_{lat_min}-{lat_min + 1}', # v1
+                                debug=False,
+                                outfp=out_nc)
+
 ```
 
 ## Contributing
