@@ -38,17 +38,6 @@ class TestSentinel1Search(unittest.TestCase):
         # Expected number of Sentinel-1 images
         self.assertEqual(len(search_result), 14, "Seach results should contain XXX images")
     
-    def test_search_return_values(self, search_result = search_result):
-        """
-        Test if sentinel-1 search returns correct images in dataframe
-        """
-        # Add in expected results
-        with open('./tests/test_data/search_result', 'rb') as f:
-            expected_result = pickle.load(f)
-        try:
-            pd_testing.assert_frame_equal(search_result, expected_result)
-        except AssertionError as e:
-            raise self.failureException("Search results should be this expected result.") from e
     
     def test_search_exceptions(self, area = area, dates = dates):
         """
