@@ -1,5 +1,5 @@
 [![MIT License][license-shield]][license-url]
-[![PIP](https://img.shields.io/badge/pip-0.1.0-purple)](https://img.shields.io/badge/pip-0.1.0-purple)
+[![PIP](https://img.shields.io/badge/pip-0.1.2-purple)](https://img.shields.io/badge/pip-0.1.2-purple)
 [![COVERAGE](https://img.shields.io/badge/coverage-86%25-green)](https://img.shields.io/badge/coverage-86%25-green) 
 [![DOI](https://zenodo.org/badge/590243635.svg)](https://zenodo.org/badge/latestdoi/590243635)
 
