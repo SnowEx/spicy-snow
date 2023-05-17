@@ -199,13 +199,8 @@ def flag_wet_snow(dataset: xr.Dataset, inplace: bool = False) -> Union[None, xr.
             # this will fail if bottleneck is installed due to it lacking the min_periods keyword
             # see: https://github.com/pydata/xarray/issues/4922
 
-            if 'bottleneck' not in sys.modules:
-                dataset['perma_wet'].loc[dict(time = melt_orbit)] = \
-                    dataset['perma_wet'].loc[dict(time = melt_orbit)].rolling(time = len(orbit_dataset.time), min_periods = 1).max()
-            else:
-                log.info("bottleneck installed. Consider pip uninstalling and re-running if this fails.")
-                dataset['perma_wet'].loc[dict(time = melt_orbit)] = \
-                    dataset['perma_wet'].loc[dict(time = melt_orbit)].rolling(time = len(orbit_dataset.time)).max()
+            dataset['perma_wet'].loc[dict(time = melt_orbit)] = \
+                dataset['perma_wet'].loc[dict(time = melt_orbit)].rolling(time = len(orbit_dataset.time), min_periods = 1).max()
     
     # if we have no data just set it to not be flagged perma_wet
     dataset['perma_wet'] = dataset['perma_wet'].where(~dataset['perma_wet'].isnull(), 0)
