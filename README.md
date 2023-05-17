@@ -36,6 +36,7 @@ from spicy_snow.IO.user_dates import get_input_dates
 # change to your minimum longitude, min lat, max long, max lat
 area = shapely.geometry.box(-113.2, 43, -113, 43.4)
 
+# this will be where your results are saved
 out_nc = Path('~/Desktop/spicy-test/test.nc').expanduser()
 
 # this will generate a tuple of dates from the previous August 1st to this date
