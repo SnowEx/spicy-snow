@@ -1,7 +1,7 @@
 """
 Functions to identify, mask, and create weights for wet-snow.
 """
-
+import sys
 import numpy as np
 import xarray as xr
 from typing import Union
@@ -171,6 +171,9 @@ def flag_wet_snow(dataset: xr.Dataset, inplace: bool = False) -> Union[None, xr.
         melt_season = (dataset['time.month'] > 1) & (dataset['time.month'] < 8)
 
         # get images of this relative orbit and in the melt season
+        melt_season = (dataset['time.month'] > 1) & (dataset['time.month'] < 8)
+
+        # get images of this relative orbit and in the melt season
         melt_orbit = (melt_season & (dataset.relative_orbit == orbit))
 
         # check if there are at least 4 time slices in melt season for this orbit
@@ -196,8 +199,13 @@ def flag_wet_snow(dataset: xr.Dataset, inplace: bool = False) -> Union[None, xr.
             # this will fail if bottleneck is installed due to it lacking the min_periods keyword
             # see: https://github.com/pydata/xarray/issues/4922
 
-            dataset['perma_wet'].loc[dict(time = melt_orbit)] = \
-                dataset['perma_wet'].loc[dict(time = melt_orbit)].rolling(time = len(orbit_dataset.time), min_periods = 1).max()
+            if 'bottleneck' not in sys.modules:
+                dataset['perma_wet'].loc[dict(time = melt_orbit)] = \
+                    dataset['perma_wet'].loc[dict(time = melt_orbit)].rolling(time = len(orbit_dataset.time), min_periods = 1).max()
+            else:
+                log.info("bottleneck installed. Consider pip uninstalling and re-running if this fails.")
+                dataset['perma_wet'].loc[dict(time = melt_orbit)] = \
+                    dataset['perma_wet'].loc[dict(time = melt_orbit)].rolling(time = len(orbit_dataset.time)).max()
     
     # if we have no data just set it to not be flagged perma_wet
     dataset['perma_wet'] = dataset['perma_wet'].where(~dataset['perma_wet'].isnull(), 0)
