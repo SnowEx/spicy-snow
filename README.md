@@ -18,10 +18,7 @@ Lievens et al 2021 - https://tc.copernicus.org/articles/16/159/2022/
 ## Example Installation
 
 ```sh
-# pip install to come! Please just add this directory to your path for now.
-# see https://stackoverflow.com/questions/32715261/how-to-add-folder-to-search-path-for-a-given-anaconda-environment
-# for instructions - be sure to conda install conda-build before running command.
-pip install c_snow
+pip install spicy-snow
 ```
 
 ## Example usage:
