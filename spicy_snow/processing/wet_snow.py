@@ -169,25 +169,45 @@ def flag_wet_snow(dataset: xr.Dataset, inplace: bool = False) -> Union[None, xr.
         # august 1st to perma-wet(2?)
     
         melt_season = (dataset['time.month'] > 1) & (dataset['time.month'] < 8)
+
+        # get images of this relative orbit and in the melt season
         melt_orbit = (melt_season & (dataset.relative_orbit == orbit))
 
         # check if there are at least 4 time slices in melt season for this orbit
-        
         if len(dataset['perma_wet'].loc[dict(time = melt_orbit)]) > 4:
+
+            # first set all perma wet to match the flagged wet times from dB drop
             dataset['perma_wet'].loc[dict(time = melt_orbit)] = \
                 dataset['wet_flag'].loc[dict(time = melt_orbit)]
             
+            # then set times that were made wet by negative snow index to wet as well
             dataset['perma_wet'].loc[dict(time = melt_orbit)] = dataset['perma_wet'].loc[dict(time = melt_orbit)] + \
                 dataset['alt_wet_flag'].loc[dict(time = melt_orbit)]
             
+            # now if we are over 1 (ie it was flagged wet by dB and negative SI flags) we should floor those back to 1
             dataset['perma_wet'].loc[dict(time = melt_orbit)] = \
                 dataset['perma_wet'].loc[dict(time = melt_orbit)].where(dataset['perma_wet'].loc[dict(time = melt_orbit)] <= 1 , 1)
+            
+            # now calculate the rolling mean of the perma wet so we have a % 0-1 of days out of 4 that were flagged
             dataset['perma_wet'].loc[dict(time = melt_orbit)] = \
                 dataset['perma_wet'].loc[dict(time = melt_orbit)].rolling(time = 4).mean()
-            dataset['perma_wet'].loc[dict(time = melt_orbit)] = \
-                dataset['perma_wet'].loc[dict(time = melt_orbit)].rolling(time = len(orbit_dataset.time), min_periods = 1).max()
-        
+            
+            # then propogate forward so that if we get to > 50% in a 4 image window we mask the remained of the melt season
+            # this will fail if bottleneck is installed due to it lacking the min_periods keyword
+            # see: https://github.com/pydata/xarray/issues/4922
+
+            if 'bottleneck' not in sys.modules:
+                dataset['perma_wet'].loc[dict(time = melt_orbit)] = \
+                    dataset['perma_wet'].loc[dict(time = melt_orbit)].rolling(time = len(orbit_dataset.time), min_periods = 1).max()
+            else:
+                log.info("bottleneck installed. Consider pip uninstalling and re-running if this fails.")
+                dataset['perma_wet'].loc[dict(time = melt_orbit)] = \
+                    dataset['perma_wet'].loc[dict(time = melt_orbit)].rolling(time = len(orbit_dataset.time)).max()
+    
+    # if we have no data just set it to not be flagged perma_wet
     dataset['perma_wet'] = dataset['perma_wet'].where(~dataset['perma_wet'].isnull(), 0)
+
+    # if less than 50% are wet then keep the save value for wet_snow otherwise set to 1
     dataset['wet_snow'] = dataset['wet_snow'].where(dataset['perma_wet'] < 0.5, 1)
 
     return dataset
