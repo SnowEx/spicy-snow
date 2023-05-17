@@ -1,7 +1,7 @@
-[![Contributors][contributors-shield]][contributors-url]
-[![Issues][issues-shield]][issues-url]
 [![MIT License][license-shield]][license-url]
-![version](https://img.shields.io/badge/version-0.0.0-green)
+[![PIP](https://img.shields.io/badge/pip-0.1.2-purple)](https://img.shields.io/badge/pip-0.1.2-purple)
+[![COVERAGE](https://img.shields.io/badge/coverage-86%25-green)](https://img.shields.io/badge/coverage-86%25-green) 
+[![DOI](https://zenodo.org/badge/590243635.svg)](https://zenodo.org/badge/latestdoi/590243635)
 
 # spicy-snow
 
@@ -84,6 +84,17 @@ Don't forget to give the project a star! Thanks again!
 3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
 4. Push to the Branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
+
+## Coverage instructions
+
+Run the following from the root directory of this project to get a coverage report.
+
+You will need to have the dependencies and `coverage` packages available.
+
+```bash
+python -m coverage run -m unittest discover -s ./tests
+python -m coverage report
+```
 
 ## License
 
