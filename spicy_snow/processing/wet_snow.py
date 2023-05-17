@@ -1,7 +1,7 @@
 """
 Functions to identify, mask, and create weights for wet-snow.
 """
-
+import sys
 import numpy as np
 import xarray as xr
 from typing import Union
@@ -168,6 +168,9 @@ def flag_wet_snow(dataset: xr.Dataset, inplace: bool = False) -> Union[None, xr.
         # if >50% wet of last 4 cycles after feb 1 then set remainer till
         # august 1st to perma-wet(2?)
     
+        melt_season = (dataset['time.month'] > 1) & (dataset['time.month'] < 8)
+
+        # get images of this relative orbit and in the melt season
         melt_season = (dataset['time.month'] > 1) & (dataset['time.month'] < 8)
 
         # get images of this relative orbit and in the melt season
