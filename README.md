@@ -1,7 +1,7 @@
 [![Contributors][contributors-shield]][contributors-url]
 [![Issues][issues-shield]][issues-url]
 [![MIT License][license-shield]][license-url]
-![version](https://img.shields.io/badge/version-0.0.0-green)
+[![PIP](https://img.shields.io/badge/pip-0.0.9-purple)](https://img.shields.io/badge/pip-0.1.0-purple)
 
 # spicy-snow
 
