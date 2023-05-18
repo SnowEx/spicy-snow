@@ -3,6 +3,8 @@ Main user function to retrieve snow depth with snow depth and wet snow flag
 """
 import os
 from os.path import join
+from pathlib import Path
+import pandas as pd
 import xarray as xr
 import shapely.geometry
 from typing import Tuple, Union, List
@@ -40,13 +42,13 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
                         existing_job_name: Union[bool, str] = False,
                         debug: bool = False,
                         outfp: Union[str, bool] = False,
-                        params: List[float] = [2.5, 0.2, 0.55] -> xr.Dataset:
+                        params: List[float] = [2.5, 0.2, 0.55]) -> xr.Dataset:
     """
     Finds, downloads Sentinel-1, forest cover, water mask, snow coverage. Then retrieves snow depth
     using Lievens et al. 2021 method.
 
     Args:
-    area: Bounding box of desired area to search within
+    area: Shapely geometry to use as bounding box of desired area to search within
     dates: Start and end date to search between
     work_dir: filepath to directory to work in. Will be created if not existing
     job_name: name for hyp3 job
@@ -59,8 +61,23 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
     datset: Xarray dataset with 'snow_depth' and 'wet_snow' variables for all Sentinel-1
     image acquistions in area and dates
     """
+
+    assert isinstance(area, shapely.geometry.Polygon), f"Must provide shapely geometry for area. Got {type(area)}"
+
+    assert isinstance(dates, list) or isinstance(dates, tuple)
+    assert len(dates) == 2, f"Can only provide two dates to work between. Got {dates}"
+
+    assert isinstance(work_dir, str) or isinstance(work_dir, Path)
+    if isinstance(work_dir, Path):
+        work_dir = str(work_dir)
+    
+    assert isinstance(debug, bool), f"Debug keyword must be boolean. Got {debug}"
+
+    assert isinstance(params, list) or isinstance(params, tuple), f"param keyword must be list or tuple. Got {type(params)}"
+    assert len(params) == 3, f"List of params must be 3 in order A, B, C. Got {params}"
     A, B, C = params
-    os.makedirs(work_dir , exist_ok = True)
+
+    os.makedirs(work_dir, exist_ok = True)
 
     setup_logging(log_dir = join(work_dir, 'logs'), debug = debug)
     log = logging.getLogger(__name__)
@@ -134,6 +151,14 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
 
     # make wet_snow flag
     ds = flag_wet_snow(ds)
+
+    ds.attrs['param_A'] = A
+    ds.attrs['param_B'] = B
+    ds.attrs['param_C'] = C
+
+    ds.attrs['job_name'] = job_name
+
+    ds.attrs['bounds'] = area.bounds
 
     if outfp:
         outfp = str(outfp)
