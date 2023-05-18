@@ -161,3 +161,5 @@ scripts/optimize/param_sds
 
 !/results/site_param_rmses/*.csv
 !/contrib/palomaki/*.csv
+
+*.sqlite
