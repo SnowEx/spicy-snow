@@ -1,7 +1,7 @@
-[![Contributors][contributors-shield]][contributors-url]
-[![Issues][issues-shield]][issues-url]
 [![MIT License][license-shield]][license-url]
-![version](https://img.shields.io/badge/version-0.0.0-green)
+[![PIP](https://img.shields.io/badge/pip-0.1.3-purple)](https://img.shields.io/badge/pip-0.1.3-purple)
+[![COVERAGE](https://img.shields.io/badge/coverage-86%25-green)](https://img.shields.io/badge/coverage-86%25-green) 
+[![DOI](https://zenodo.org/badge/590243635.svg)](https://zenodo.org/badge/latestdoi/590243635)
 
 # spicy-snow
 
@@ -18,10 +18,7 @@ Lievens et al 2021 - https://tc.copernicus.org/articles/16/159/2022/
 ## Example Installation
 
 ```sh
-# pip install to come! Please just add this directory to your path for now.
-# see https://stackoverflow.com/questions/32715261/how-to-add-folder-to-search-path-for-a-given-anaconda-environment
-# for instructions - be sure to conda install conda-build before running command.
-pip install c_snow
+pip install spicy-snow
 ```
 
 ## Example usage:
@@ -39,6 +36,7 @@ from spicy_snow.IO.user_dates import get_input_dates
 # change to your minimum longitude, min lat, max long, max lat
 area = shapely.geometry.box(-113.2, 43, -113, 43.4)
 
+# this will be where your results are saved
 out_nc = Path('~/Desktop/spicy-test/test.nc').expanduser()
 
 # this will generate a tuple of dates from the previous August 1st to this date
@@ -87,6 +85,17 @@ Don't forget to give the project a star! Thanks again!
 4. Push to the Branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
+## Coverage instructions
+
+Run the following from the root directory of this project to get a coverage report.
+
+You will need to have the dependencies and `coverage` packages available.
+
+```bash
+python -m coverage run -m unittest discover -s ./tests
+python -m coverage report
+```
+
 ## License
 
 Distributed under the MIT License. See `LICENSE` for more information.
@@ -99,7 +108,7 @@ Title image: https://openai.com/dall-e-2/
 
 ## Contact
 
-Zach Keskinen: zachary.keskinen@boisestate.edu
+Zach Keskinen: zacharykeskinen@boisestate.edu
 
 Project Link: https://github.com/SnowEx/spicy-snow
 
