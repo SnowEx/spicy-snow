@@ -15,8 +15,8 @@ in the home directory of this file.
 to have github auto-release:
 https://dev.to/iamtekson/publish-package-to-pypi-and-release-new-version-using-github-actions-108k
 
-git tag -a "v0.0.6" -m "new tag"
-git push --tags
+git tag -a 0.0.6 -m "new tag"
+git push origin 0.0.6
 """
 
 import io
