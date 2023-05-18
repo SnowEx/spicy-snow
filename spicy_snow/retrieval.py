@@ -5,7 +5,7 @@ import os
 from os.path import join
 import xarray as xr
 import shapely.geometry
-from typing import Tuple, Union
+from typing import Tuple, Union, List
 import logging
 
 # Add main repo to path
@@ -39,7 +39,8 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
                         job_name: str = 'spicy-snow-run',
                         existing_job_name: Union[bool, str] = False,
                         debug: bool = False,
-                        outfp: Union[str, bool] = False) -> xr.Dataset:
+                        outfp: Union[str, bool] = False,
+                        params: List[float] = [2.5, 0.2, 0.55] -> xr.Dataset:
     """
     Finds, downloads Sentinel-1, forest cover, water mask, snow coverage. Then retrieves snow depth
     using Lievens et al. 2021 method.
@@ -52,11 +53,13 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
     existing_job_name: name for preexisiting hyp3 job to download and avoid resubmitting
     debug: do you want to get verbose logging?
     outfp: do you want to save netcdf? default is False and will just return dataset
+    params: the A, B, C parameters to use in the model. Current defaults are optimized to north america
 
     Returns:
     datset: Xarray dataset with 'snow_depth' and 'wet_snow' variables for all Sentinel-1
     image acquistions in area and dates
     """
+    A, B, C = params
     os.makedirs(work_dir , exist_ok = True)
 
     setup_logging(log_dir = join(work_dir, 'logs'), debug = debug)
@@ -105,11 +108,11 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
     ## Snow Index Steps
     log.info("Calculating snow index")
     # calculate delta CR and delta VV
-    ds = calc_delta_cross_ratio(ds)
+    ds = calc_delta_cross_ratio(ds, A = A)
     ds = calc_delta_VV(ds)
 
     # calculate delta gamma with delta CR and delta VV with FCF
-    ds = calc_delta_gamma(ds)
+    ds = calc_delta_gamma(ds, B = B)
 
     # clip outliers of delta gamma
     ds = clip_delta_gamma_outlier(ds)
@@ -118,7 +121,7 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
     ds = calc_snow_index(ds)
 
     # convert snow index to snow depth
-    ds = calc_snow_index_to_snow_depth(ds)
+    ds = calc_snow_index_to_snow_depth(ds, C = C)
 
     ## Wet Snow Flags
     log.info("Flag wet snow")
