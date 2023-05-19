@@ -17,7 +17,8 @@ from spicy_snow.retrieval import retrieve_snow_depth
 from spicy_snow.download.snowex_lidar import download_dem, download_snow_depth,\
       download_veg_height, make_site_ds
 
-lidar_dir = '/home/zacharykeskinen/scratch/lidar'
+lidar_dir = '/bsuhome/zacharykeskinen/scratch/lidar'
+os.makedirs(lidar_dir, exist_ok = True)
 download_snow_depth(lidar_dir)
 download_veg_height(lidar_dir)
 download_dem(lidar_dir)
@@ -25,7 +26,7 @@ download_dem(lidar_dir)
 sites = {'USCOCP': 'Cameron', 'USCOFR': 'Frasier', 'USIDBS': 'Banner', 
          'USIDDC': 'Dry_Creek', 'USIDMC': 'Mores', 'USUTLC': 'Little_Cottonwood'}
 
-sites = {'USCOFR': 'Frasier', 'USUTLC':'Little_Cottonwood'}
+# sites = {'USCOFR': 'Frasier', 'USUTLC':'Little_Cottonwood'}
 
 for site, site_name in sites.items():
     print(''.center(40, '-'))
@@ -38,8 +39,8 @@ for site, site_name in sites.items():
     area = shapely.geometry.box(*lidar_ds_site.rio.bounds())
 
     for date in lidar_ds_site.time:
-        os.makedirs('/home/zacharykeskinen/scratch/SnowEx-Data/', exist_ok = True)
-        out_nc = f'/home/zacharykeskinen/scratch/SnowEx-Data/{site_name}_{(date).dt.strftime("%Y-%m-%d").values}.nc'
+        os.makedirs('/bsuhome/zacharykeskinen/scratch/SnowEx-Data/', exist_ok = True)
+        out_nc = f'/bsuhome/zacharykeskinen/scratch/SnowEx-Data/{site_name}_{(date).dt.strftime("%Y-%m-%d").values}.nc'
 
         if exists(out_nc):
             print(f'Outfile {out_nc} exists already.')
@@ -59,7 +60,7 @@ for site, site_name in sites.items():
 
         dates = (date1.strftime('%Y-%m-%d'), pd.to_datetime((date + pd.Timedelta('14 day')).values).strftime('%Y-%m-%d'))
 
-        spicy_ds = retrieve_snow_depth(area = area, dates = dates, work_dir = '/home/zacharykeskinen/scratch/data/', job_name = f'spicy_{site}_{dates[1]}', existing_job_name = f'spicy_{site}_{dates[1]}')
+        spicy_ds = retrieve_snow_depth(area = area, dates = dates, work_dir = '/bsuhome/zacharykeskinen/scratch/data/', job_name = f'spicy_{site}_{dates[1]}', existing_job_name = f'spicy_{site}_{dates[1]}')
 
         lidar_ds = lidar_ds.rio.reproject_match(spicy_ds)
 
