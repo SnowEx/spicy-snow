@@ -4,6 +4,9 @@ authors:
   - family-names: "Keskinen"
     given-names: "Zachary"
     orcid: "https://orcid.org/0000-0003-0916-7774"
+  - family-names: "Brencher"
+    given-names: "George"
+    orcid: "https://orcid.org/0000-0002-3570-7116"
 title: "Spicy Snow"
 version: 0.1.0
 doi: 10.5281/zenodo.7946534
