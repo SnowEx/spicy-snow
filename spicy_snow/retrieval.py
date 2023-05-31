@@ -42,13 +42,13 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
                         existing_job_name: Union[bool, str] = False,
                         debug: bool = False,
                         ims_masking: bool = True,
-                        wet_snow_thresh: float = - 2,
+                        wet_snow_thresh: float = -2,
                         freezing_snow_thresh: float = 2,
                         outfp: Union[str, bool] = False,
                         params: List[float] = [2.5, 0.2, 0.55]) -> xr.Dataset:
     """
-    Finds, downloads Sentinel-1, forest cover, water mask, snow coverage. Then retrieves snow depth
-    using Lievens et al. 2021 method.
+    Finds, downloads Sentinel-1, forest cover, water mask (not implemented), and 
+    snow coverage. Then retrieves snow depth using Lievens et al. 2021 method.
 
     Args:
     area: Shapely geometry to use as bounding box of desired area to search within
@@ -103,7 +103,7 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
     search_results = s1_img_search(area, dates)
     log.info(f'Found {len(search_results)} results')
 
-    # download s1 images into dataset ['s1'] keyword
+    # download s1 images into dataset ['s1'] variable name
     jobs = hyp3_pipeline(search_results, job_name = job_name, existing_job_name = existing_job_name)
     imgs = download_hyp3(jobs, area, outdir = join(work_dir, 'tmp'), clean = False)
     ds = combine_s1_images(imgs)
