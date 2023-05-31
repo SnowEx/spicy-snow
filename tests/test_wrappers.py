@@ -38,6 +38,6 @@ class TestWrappers(unittest.TestCase):
         self.assertRaises(AssertionError, retrieve_snow_depth, area, dates, '/tmp', 'job_name_test', 'job_name_test', 'debug this')
 
         # test params
-        self.assertRaises(AssertionError, retrieve_snow_depth, area, dates, '/tmp', 'job_name_test', 'job_name_test', True, 'out.nc', [10, 1])
+        self.assertRaises(AssertionError, retrieve_snow_depth, area, dates, '/tmp', 'job_name_test', 'job_name_test', True, 'out.nc', params = [10, 1])
 
-        self.assertRaises(AssertionError, retrieve_snow_depth, area, dates, '/tmp', 'job_name_test', 'job_name_test', True, 'out.nc', 10)
+        self.assertRaises(AssertionError, retrieve_snow_depth, area, dates, '/tmp', 'job_name_test', 'job_name_test', True, 'out.nc', params = 10)

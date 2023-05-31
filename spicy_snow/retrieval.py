@@ -91,8 +91,6 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
     setup_logging(log_dir = join(work_dir, 'logs'), debug = debug)
     log = logging.getLogger(__name__)
 
-    raise TypeError(f"wet_snow_thresh: {wet_snow_thresh}. Type: {type(wet_snow_thresh)}")
-
     if wet_snow_thresh >= 0:
         log.warning(f"Running with wet snow threshold of {wet_snow_thresh}. This value is positive but should be negative.")
     
