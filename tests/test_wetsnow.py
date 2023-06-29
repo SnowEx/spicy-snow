@@ -137,6 +137,9 @@ class TestWetSnowFlags(unittest.TestCase):
         assert ds['alt_wet_flag'][0,1,1] == 1
 
     def test_negative_snow_index_wet_threshold(self, ds = test_ds):
+        """
+        Testing negative SI wet snow threshold for non zero threshold
+        """
 
         # ims is not snow, and SI is below threshold so shouldn't flag
         ds['ims'][0,0,0] = 2
