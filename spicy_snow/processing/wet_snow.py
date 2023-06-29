@@ -83,6 +83,7 @@ def id_wet_negative_si(dataset: xr.Dataset, wet_SI_thresh = 0, inplace: bool = F
 
     Args:
     dataset: xarray dataset with snow_index as data vars
+    wet_SI_thresh: threshold to use for negative SI [default: 0]
     inplace: return copy of dataset or operate on dataset inplace?
 
     Returns:
