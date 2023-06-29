@@ -161,7 +161,7 @@ class TestWetSnowFlags(unittest.TestCase):
         ds['ims'][0,1,1] = 4
         ds['snow_index'][0,1,1] = -2
 
-        # ims is snow and SI is above threshold so should flag
+        # ims is snow and SI is above threshold so should not flag
         ds['ims'][0,1,2] = 4
         ds['snow_index'][0,1,2] = -0.9
 
