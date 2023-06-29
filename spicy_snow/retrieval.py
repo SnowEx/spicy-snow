@@ -44,6 +44,7 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
                         ims_masking: bool = True,
                         wet_snow_thresh: float = -2,
                         freezing_snow_thresh: float = 2,
+                        wet_SI_thresh: float = 0,
                         outfp: Union[str, bool] = False,
                         params: List[float] = [2.5, 0.2, 0.55]) -> xr.Dataset:
     """
@@ -159,7 +160,7 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
     log.info("Flag wet snow")
     # find newly wet snow
     ds = id_newly_wet_snow(ds, wet_thresh = wet_snow_thresh)
-    ds = id_wet_negative_si(ds)
+    ds = id_wet_negative_si(ds, wet_SI_thresh = wet_SI_thresh)
 
     # find newly frozen snow
     ds = id_newly_frozen_snow(ds, freeze_thresh = freezing_snow_thresh)
