@@ -59,8 +59,9 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
     existing_job_name: name for preexisiting hyp3 job to download and avoid resubmitting
     debug: do you want to get verbose logging?
     ims_masking: do you want to mask pixels by IMS snow free imagery?
-    wet_snow_thresh: what threshold in dB change to use for melting and re-freezing snow?
-    freezing_snow_thresh: what threshold in dB change to use for re-freezing snow id?
+    wet_snow_thresh: what threshold in dB change to use for melting and re-freezing snow? Default: -2
+    freezing_snow_thresh: what threshold in dB change to use for re-freezing snow id. Default: +2
+    wet_SI_thresh: what threshold to use for negative snow index? Default: 0
     outfp: do you want to save netcdf? default is False and will just return dataset
     params: the A, B, C parameters to use in the model. Current defaults are optimized to north america
 
