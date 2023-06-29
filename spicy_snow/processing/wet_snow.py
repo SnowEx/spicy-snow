@@ -76,7 +76,7 @@ def id_newly_frozen_snow(dataset: xr.Dataset, freeze_thresh: int = 2, inplace: b
     if not inplace:
         return dataset
 
-def id_wet_negative_si(dataset: xr.Dataset, inplace: bool = False) -> Union[None, xr.Dataset]:
+def id_wet_negative_si(dataset: xr.Dataset, wet_SI_thresh = 0, inplace: bool = False) -> Union[None, xr.Dataset]:
     """
     Additional wet snow criteria if sd retrieval (snow-index since they are linear)
     becomes negative with snow cover is present we set pixel to wet.
@@ -102,7 +102,7 @@ def id_wet_negative_si(dataset: xr.Dataset, inplace: bool = False) -> Union[None
         dataset['alt_wet_flag'] = xr.zeros_like(dataset['deltaVV'])
 
     # identify wetting of snow by negative snow index with snow present
-    dataset['alt_wet_flag'] = dataset['alt_wet_flag'].where(((dataset['ims'] != 4) | (dataset['snow_index'] > 0)), 1)
+    dataset['alt_wet_flag'] = dataset['alt_wet_flag'].where(((dataset['ims'] != 4) | (dataset['snow_index'] > wet_SI_thresh)), 1)
 
     if not inplace:
         return dataset

@@ -136,6 +136,43 @@ class TestWetSnowFlags(unittest.TestCase):
         assert ds['alt_wet_flag'][0,3,0] == 0
         assert ds['alt_wet_flag'][0,1,1] == 1
 
+    def test_negative_snow_index_wet_threshold(self, ds = test_ds):
+
+        # ims is not snow, and SI is below threshold so shouldn't flag
+        ds['ims'][0,0,0] = 2
+        ds['snow_index'][0,0,0] = -2
+
+        # ims is snow and SI is below threshold so should flag
+        ds['ims'][0,1,0] = 4
+        ds['snow_index'][0,1,0] = -2
+
+        # ims is not snow and si is above threshold so shouldn't flag
+        ds['ims'][0,2,0] = 2
+        ds['snow_index'][0,2,0] = 1
+
+        # ims is snow but SI is above threshold so shouldn't flag
+        ds['ims'][0,3,0] = 4
+        ds['snow_index'][0,3,0] = 1
+
+        # ims is snow and SI is below threshold so should flag
+        ds['ims'][0,1,1] = 4
+        ds['snow_index'][0,1,1] = -2
+
+        # ims is snow and SI is above threshold so should flag
+        ds['ims'][0,1,2] = 4
+        ds['snow_index'][0,1,2] = -0.9
+
+
+        # identify possible newly wet snow in regions with SI < 4 and IMS == 4
+        ds = id_wet_negative_si(ds, wet_SI_thresh = -1)
+
+        assert ds['alt_wet_flag'][0,0,0] == 0
+        assert ds['alt_wet_flag'][0,1,0] == 1
+        assert ds['alt_wet_flag'][0,2,0] == 0
+        assert ds['alt_wet_flag'][0,3,0] == 0
+        assert ds['alt_wet_flag'][0,1,1] == 1
+        assert ds['alt_wet_flag'][0,1,2] == 0
+
     def test_id_wet_one_orbit(self):
         """
         Test id wet snow
