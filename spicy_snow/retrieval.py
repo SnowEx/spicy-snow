@@ -44,6 +44,7 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
                         ims_masking: bool = True,
                         wet_snow_thresh: float = -2,
                         freezing_snow_thresh: float = 2,
+                        wet_SI_thresh: float = 0,
                         outfp: Union[str, bool] = False,
                         params: List[float] = [2.5, 0.2, 0.55]) -> xr.Dataset:
     """
@@ -58,8 +59,9 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
     existing_job_name: name for preexisiting hyp3 job to download and avoid resubmitting
     debug: do you want to get verbose logging?
     ims_masking: do you want to mask pixels by IMS snow free imagery?
-    wet_snow_thresh: what threshold in dB change to use for melting and re-freezing snow?
-    freezing_snow_thresh: what threshold in dB change to use for re-freezing snow id?
+    wet_snow_thresh: what threshold in dB change to use for melting and re-freezing snow? Default: -2
+    freezing_snow_thresh: what threshold in dB change to use for re-freezing snow id. Default: +2
+    wet_SI_thresh: what threshold to use for negative snow index? Default: 0
     outfp: do you want to save netcdf? default is False and will just return dataset
     params: the A, B, C parameters to use in the model. Current defaults are optimized to north america
 
@@ -159,7 +161,7 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
     log.info("Flag wet snow")
     # find newly wet snow
     ds = id_newly_wet_snow(ds, wet_thresh = wet_snow_thresh)
-    ds = id_wet_negative_si(ds)
+    ds = id_wet_negative_si(ds, wet_SI_thresh = wet_SI_thresh)
 
     # find newly frozen snow
     ds = id_newly_frozen_snow(ds, freeze_thresh = freezing_snow_thresh)
