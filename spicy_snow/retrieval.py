@@ -121,6 +121,13 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
 
     ## Preprocessing Steps
     log.info("Preprocessing Sentinel-1 images")
+
+    #TODO add water mask
+    # ds = ims_water_mask(ds)
+
+    # mask out outliers in incidence angle
+    ds = s1_incidence_angle_masking(ds)
+    
     # subset dataset by flight_dir and platform
     dict_ds = subset_s1_images(ds)
 
@@ -132,12 +139,6 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
     
     # recombine subsets
     ds = merge_s1_subsets(dict_ds)
-
-    # add water mask
-    # ds = ims_water_mask(ds)
-
-    # mask out outliers in incidence angle
-    ds = s1_incidence_angle_masking(ds)
 
     ## Snow Index Steps
     log.info("Calculating snow index")
