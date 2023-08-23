@@ -3,9 +3,11 @@ Main user function to retrieve snow depth with snow depth and wet snow flag
 """
 import os
 from os.path import join
+from pathlib import Path
+import pandas as pd
 import xarray as xr
 import shapely.geometry
-from typing import Tuple, Union
+from typing import Tuple, Union, List
 import logging
 
 # Add main repo to path
@@ -39,36 +41,71 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
                         job_name: str = 'spicy-snow-run',
                         existing_job_name: Union[bool, str] = False,
                         debug: bool = False,
-                        outfp: Union[str, bool] = False) -> xr.Dataset:
+                        ims_masking: bool = True,
+                        wet_snow_thresh: float = -2,
+                        freezing_snow_thresh: float = 2,
+                        wet_SI_thresh: float = 0,
+                        outfp: Union[str, bool] = False,
+                        params: List[float] = [2.5, 0.2, 0.55]) -> xr.Dataset:
     """
-    Finds, downloads Sentinel-1, forest cover, water mask, snow coverage. Then retrieves snow depth
-    using Lievens et al. 2021 method.
+    Finds, downloads Sentinel-1, forest cover, water mask (not implemented), and 
+    snow coverage. Then retrieves snow depth using Lievens et al. 2021 method.
 
     Args:
-    area: Bounding box of desired area to search within
+    area: Shapely geometry to use as bounding box of desired area to search within
     dates: Start and end date to search between
     work_dir: filepath to directory to work in. Will be created if not existing
     job_name: name for hyp3 job
     existing_job_name: name for preexisiting hyp3 job to download and avoid resubmitting
     debug: do you want to get verbose logging?
+    ims_masking: do you want to mask pixels by IMS snow free imagery?
+    wet_snow_thresh: what threshold in dB change to use for melting and re-freezing snow? Default: -2
+    freezing_snow_thresh: what threshold in dB change to use for re-freezing snow id. Default: +2
+    wet_SI_thresh: what threshold to use for negative snow index? Default: 0
     outfp: do you want to save netcdf? default is False and will just return dataset
+    params: the A, B, C parameters to use in the model. Current defaults are optimized to north america
 
     Returns:
     datset: Xarray dataset with 'snow_depth' and 'wet_snow' variables for all Sentinel-1
     image acquistions in area and dates
     """
-    os.makedirs(work_dir , exist_ok = True)
+
+    ## argument checking
+    assert isinstance(area, shapely.geometry.Polygon), f"Must provide shapely geometry for area. Got {type(area)}"
+
+    assert isinstance(dates, list) or isinstance(dates, tuple)
+    assert len(dates) == 2, f"Can only provide two dates to work between. Got {dates}"
+
+    assert isinstance(work_dir, str) or isinstance(work_dir, Path)
+    if isinstance(work_dir, Path):
+        work_dir = str(work_dir)
+    
+    assert isinstance(debug, bool), f"Debug keyword must be boolean. Got {debug}"
+
+    assert isinstance(params, list) or isinstance(params, tuple), f"param keyword must be list or tuple. Got {type(params)}"
+    assert len(params) == 3, f"List of params must be 3 in order A, B, C. Got {params}"
+    A, B, C = params
+
+    ## set up directories and logging
+
+    os.makedirs(work_dir, exist_ok = True)
 
     setup_logging(log_dir = join(work_dir, 'logs'), debug = debug)
     log = logging.getLogger(__name__)
 
+    if wet_snow_thresh >= 0:
+        log.warning(f"Running with wet snow threshold of {wet_snow_thresh}. This value is positive but should be negative.")
+    
+    if freezing_snow_thresh <= 0:
+        log.warning(f"Running with refreeze threshold of {freezing_snow_thresh}. This value is negative but should be positive.")
+    
     ## Downloading Steps
 
     # get asf_search search results
     search_results = s1_img_search(area, dates)
     log.info(f'Found {len(search_results)} results')
 
-    # download s1 images into dataset ['s1'] keyword
+    # download s1 images into dataset ['s1'] variable name
     jobs = hyp3_pipeline(search_results, job_name = job_name, existing_job_name = existing_job_name)
     imgs = download_hyp3(jobs, area, outdir = join(work_dir, 'tmp'), clean = False)
     ds = combine_s1_images(imgs)
@@ -105,32 +142,40 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
     ## Snow Index Steps
     log.info("Calculating snow index")
     # calculate delta CR and delta VV
-    ds = calc_delta_cross_ratio(ds)
+    ds = calc_delta_cross_ratio(ds, A = A)
     ds = calc_delta_VV(ds)
 
     # calculate delta gamma with delta CR and delta VV with FCF
-    ds = calc_delta_gamma(ds)
+    ds = calc_delta_gamma(ds, B = B)
 
     # clip outliers of delta gamma
     ds = clip_delta_gamma_outlier(ds)
 
     # calculate snow_index from delta_gamma
-    ds = calc_snow_index(ds)
+    ds = calc_snow_index(ds, ims_masking = ims_masking)
 
     # convert snow index to snow depth
-    ds = calc_snow_index_to_snow_depth(ds)
+    ds = calc_snow_index_to_snow_depth(ds, C = C)
 
     ## Wet Snow Flags
     log.info("Flag wet snow")
     # find newly wet snow
-    ds = id_newly_wet_snow(ds)
-    ds = id_wet_negative_si(ds)
+    ds = id_newly_wet_snow(ds, wet_thresh = wet_snow_thresh)
+    ds = id_wet_negative_si(ds, wet_SI_thresh = wet_SI_thresh)
 
     # find newly frozen snow
-    ds = id_newly_frozen_snow(ds)
+    ds = id_newly_frozen_snow(ds, freeze_thresh = freezing_snow_thresh)
 
     # make wet_snow flag
     ds = flag_wet_snow(ds)
+
+    ds.attrs['param_A'] = A
+    ds.attrs['param_B'] = B
+    ds.attrs['param_C'] = C
+
+    ds.attrs['job_name'] = job_name
+
+    ds.attrs['bounds'] = area.bounds
 
     if outfp:
         outfp = str(outfp)

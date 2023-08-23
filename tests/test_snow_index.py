@@ -533,6 +533,12 @@ class TestSnowIndex(unittest.TestCase):
 
         assert ds['snow_index'].sel(time = '2020-01-02', x = 5, y = 5) == 0
 
+        # check with ims_masking disabled
+
+        ds = calc_snow_index(test_ds, ims_masking=False)
+
+        assert ds['snow_index'].sel(time = '2020-01-02', x = 5, y = 5) != 0
+
     def test_snow_index_to_depth(self):
 
         backscatter = np.random.randn(10, 10, 3, 3)

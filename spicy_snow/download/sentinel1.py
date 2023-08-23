@@ -49,7 +49,7 @@ def s1_img_search(area: shapely.geometry.Polygon, dates: Tuple[str, str]) -> pd.
     dates = [pd.to_datetime(d) for d in dates]
     if dates[1] < dates[0]:
         raise ValueError("End date is before start date")
-    if dates[0].year < 2017 or dates[1].year < 2017:
+    if dates[0].year < 2014 or dates[1].year < 2014:
         raise IndexError("Dates are prior to Sentinel-1 launch dates")
     if dates[0].date() > date.today() or dates[1].date() > date.today():
         raise IndexError("Dates are in the future.")
