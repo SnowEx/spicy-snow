@@ -16,7 +16,7 @@ def get_stats(a, b):
     error = mae(a, b)
     return r, error
 
-res_fp = Path('../../data/res_ds_iter.nc')
+res_fp = Path('/bsuhome/zacharykeskinen/spicy-snow/data/res_ds_iter.nc')
 
 if res_fp.exists():
     res_ds = xr.load_dataset(res_fp)
