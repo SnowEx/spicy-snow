@@ -208,6 +208,9 @@ def retrieval_from_parameters(dataset: xr.Dataset,
 
     # dataset = dataset[['s1','deltaVV','ims','fcf','lidar-sd']]
 
+    # load datast to index
+    dataset = dataset.load()
+
     # calculate delta CR and delta VV
     dataset = calc_delta_cross_ratio(dataset, A = A)
 
