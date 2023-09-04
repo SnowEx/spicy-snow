@@ -41,11 +41,15 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
                         job_name: str = 'spicy-snow-run',
                         existing_job_name: Union[bool, str] = False,
                         debug: bool = False,
+                        ims_masking: bool = True,
+                        wet_snow_thresh: float = -2,
+                        freezing_snow_thresh: float = 2,
+                        wet_SI_thresh: float = 0,
                         outfp: Union[str, bool] = False,
                         params: List[float] = [2.5, 0.2, 0.55]) -> xr.Dataset:
     """
-    Finds, downloads Sentinel-1, forest cover, water mask, snow coverage. Then retrieves snow depth
-    using Lievens et al. 2021 method.
+    Finds, downloads Sentinel-1, forest cover, water mask (not implemented), and 
+    snow coverage. Then retrieves snow depth using Lievens et al. 2021 method.
 
     Args:
     area: Shapely geometry to use as bounding box of desired area to search within
@@ -54,6 +58,10 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
     job_name: name for hyp3 job
     existing_job_name: name for preexisiting hyp3 job to download and avoid resubmitting
     debug: do you want to get verbose logging?
+    ims_masking: do you want to mask pixels by IMS snow free imagery?
+    wet_snow_thresh: what threshold in dB change to use for melting and re-freezing snow? Default: -2
+    freezing_snow_thresh: what threshold in dB change to use for re-freezing snow id. Default: +2
+    wet_SI_thresh: what threshold to use for negative snow index? Default: 0
     outfp: do you want to save netcdf? default is False and will just return dataset
     params: the A, B, C parameters to use in the model. Current defaults are optimized to north america
 
@@ -62,6 +70,7 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
     image acquistions in area and dates
     """
 
+    ## argument checking
     assert isinstance(area, shapely.geometry.Polygon), f"Must provide shapely geometry for area. Got {type(area)}"
 
     assert isinstance(dates, list) or isinstance(dates, tuple)
@@ -77,18 +86,26 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
     assert len(params) == 3, f"List of params must be 3 in order A, B, C. Got {params}"
     A, B, C = params
 
+    ## set up directories and logging
+
     os.makedirs(work_dir, exist_ok = True)
 
     setup_logging(log_dir = join(work_dir, 'logs'), debug = debug)
     log = logging.getLogger(__name__)
 
+    if wet_snow_thresh >= 0:
+        log.warning(f"Running with wet snow threshold of {wet_snow_thresh}. This value is positive but should be negative.")
+    
+    if freezing_snow_thresh <= 0:
+        log.warning(f"Running with refreeze threshold of {freezing_snow_thresh}. This value is negative but should be positive.")
+    
     ## Downloading Steps
 
     # get asf_search search results
     search_results = s1_img_search(area, dates)
     log.info(f'Found {len(search_results)} results')
 
-    # download s1 images into dataset ['s1'] keyword
+    # download s1 images into dataset ['s1'] variable name
     jobs = hyp3_pipeline(search_results, job_name = job_name, existing_job_name = existing_job_name)
     imgs = download_hyp3(jobs, area, outdir = join(work_dir, 'tmp'), clean = False)
     ds = combine_s1_images(imgs)
@@ -104,6 +121,13 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
 
     ## Preprocessing Steps
     log.info("Preprocessing Sentinel-1 images")
+
+    #TODO add water mask
+    # ds = ims_water_mask(ds)
+
+    # mask out outliers in incidence angle
+    ds = s1_incidence_angle_masking(ds)
+    
     # subset dataset by flight_dir and platform
     dict_ds = subset_s1_images(ds)
 
@@ -115,12 +139,6 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
     
     # recombine subsets
     ds = merge_s1_subsets(dict_ds)
-
-    # add water mask
-    # ds = ims_water_mask(ds)
-
-    # mask out outliers in incidence angle
-    ds = s1_incidence_angle_masking(ds)
 
     ## Snow Index Steps
     log.info("Calculating snow index")
@@ -135,7 +153,7 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
     ds = clip_delta_gamma_outlier(ds)
 
     # calculate snow_index from delta_gamma
-    ds = calc_snow_index(ds)
+    ds = calc_snow_index(ds, ims_masking = ims_masking)
 
     # convert snow index to snow depth
     ds = calc_snow_index_to_snow_depth(ds, C = C)
@@ -143,11 +161,11 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
     ## Wet Snow Flags
     log.info("Flag wet snow")
     # find newly wet snow
-    ds = id_newly_wet_snow(ds)
-    ds = id_wet_negative_si(ds)
+    ds = id_newly_wet_snow(ds, wet_thresh = wet_snow_thresh)
+    ds = id_wet_negative_si(ds, wet_SI_thresh = wet_SI_thresh)
 
     # find newly frozen snow
-    ds = id_newly_frozen_snow(ds)
+    ds = id_newly_frozen_snow(ds, freeze_thresh = freezing_snow_thresh)
 
     # make wet_snow flag
     ds = flag_wet_snow(ds)

@@ -231,7 +231,7 @@ def calc_prev_snow_index(dataset: xr.Dataset, current_time: np.datetime64, repea
 
     return prev_si
 
-def calc_snow_index(dataset: xr.Dataset, inplace: bool = False) -> Union[None, xr.Dataset]:
+def calc_snow_index(dataset: xr.Dataset, ims_masking: bool = True, inplace: bool = False) -> Union[None, xr.Dataset]:
     """
     Calculate snow index for each time step from previous time steps' snow index
     weights, and current delta-gamma.
@@ -243,6 +243,7 @@ def calc_snow_index(dataset: xr.Dataset, inplace: bool = False) -> Union[None, x
 
     Args:
     dataset: Xarray Dataset of sentinel images with delta-gamma
+    ims_masking: whether to mask pixels with the IMS data
     inplace: operate on dataset in place or return copy
 
     Returns:
@@ -271,7 +272,8 @@ def calc_snow_index(dataset: xr.Dataset, inplace: bool = False) -> Union[None, x
         dataset['snow_index'].loc[dict(time = ct)] = prev_si + dataset['deltaGamma'].sel(time = ct)
         
         # change to 0 when ims snow cover is not 4
-        dataset['snow_index'].loc[dict(time = ct)] = dataset['snow_index'].sel(time = ct).where(dataset['ims'].sel(time = ct) == 4, 0)
+        if ims_masking:
+            dataset['snow_index'].loc[dict(time = ct)] = dataset['snow_index'].sel(time = ct).where(dataset['ims'].sel(time = ct) == 4, 0)
 
         # change to 0 when snow_index is negative
         dataset['snow_index'].loc[dict(time = ct)] = \
