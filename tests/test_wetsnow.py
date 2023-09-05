@@ -547,8 +547,6 @@ class TestWetSnowFlags(unittest.TestCase):
         ds['alt_wet_flag'].loc[dict(time = t, x = xi, y = yi)] = 0
         ds['freeze_flag'].loc[dict(time = t, x = xi, y = yi)] = 1
 
-
-
         t = ds.time[11]
         ds['wet_flag'].loc[dict(time = t, x = xi, y = yi)] = 0
         ds['alt_wet_flag'].loc[dict(time = t, x = xi, y = yi)] = 1
@@ -563,6 +561,14 @@ class TestWetSnowFlags(unittest.TestCase):
         ds['wet_flag'].loc[dict(time = t, x = xi, y = yi)] = 0
         ds['alt_wet_flag'].loc[dict(time = t, x = xi, y = yi)] = 0
         ds['freeze_flag'].loc[dict(time = t, x = xi, y = yi)] = 1
+
+        # set one to nan and be sure it is nan for perma wet
+        t = ds.time[15]
+        xi , yi = 4 ,4 
+        ds['wet_flag'].loc[dict(time = t, x = xi, y = yi)] = 0
+        ds['alt_wet_flag'].loc[dict(time = t, x = xi, y = yi)] = 0
+        ds['freeze_flag'].loc[dict(time = t, x = xi, y = yi)] = 1
+        ds['s1'].loc[dict(time = t, x = xi, y = yi, band = 'VV')] = np.nan
 
         ds = flag_wet_snow(ds)
 
@@ -599,6 +605,8 @@ class TestWetSnowFlags(unittest.TestCase):
         self.assertEqual(ds['wet_snow'].sel(time = ds.time[3]).loc[dict(x = 3, y = 3)], 1)
         self.assertEqual(ds['wet_snow'].sel(time = ds.time[5]).loc[dict(x = 3, y = 3)], 0)
         self.assertEqual(ds['wet_snow'].sel(time = ds.time[7]).loc[dict(x = 3, y = 3)], 0)
+
+        self.assertTrue(np.isnan(ds['wet_snow'].loc[dict(time = ds.time[15], x = 4, y = 4)].values))
         
 if __name__ == '__main__':
     unittest.main()
