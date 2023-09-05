@@ -169,11 +169,17 @@ def flag_wet_snow(dataset: xr.Dataset, inplace: bool = False) -> Union[None, xr.
             dataset['wet_snow'].loc[dict(time = ts)]= dataset.sel(time = ts)['wet_snow'] + dataset.sel(time = ts)['wet_flag']
             dataset['wet_snow'].loc[dict(time = ts)] = dataset.sel(time = ts)['wet_snow'] + dataset.sel(time = ts)['alt_wet_flag']
             dataset['wet_snow'].loc[dict(time = ts)] = dataset.sel(time = ts)['wet_snow'].where(dataset.sel(time = ts)['wet_snow'] < 1, 1)
+            
             # add newly frozen snow flags to old wet snow and then bound at 0 to avoid negatives
             dataset['wet_snow'].loc[dict(time = ts)] = dataset.sel(time = ts)['wet_snow'] - dataset.sel(time = ts)['freeze_flag']
             dataset['wet_snow'].loc[dict(time = ts)] = dataset.sel(time = ts)['wet_snow'].where(dataset.sel(time = ts)['wet_snow'] > 0, 0)
 
+            # make nans at areas without S1 data
             dataset['wet_snow'].loc[dict(time = ts)] = dataset.sel(time = ts)['wet_snow'].where(~dataset['s1'].sel(time = ts, band = 'VV').isnull(), np.nan)
+            
+            # make
+            dataset['wet_snow'].loc[dict(time = ts)] = dataset.sel(time = ts)['wet_snow'].where(dataset.sel(time = ts)['ims'] == 4, 0)
+            
             prev_time = ts
 
         # if >50% wet of last 4 cycles after feb 1 then set remainer till
