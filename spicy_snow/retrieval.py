@@ -185,7 +185,13 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
 
     return ds
 
-def retrieval_from_parameters(dataset: xr.Dataset, A: float, B: float, C: float):
+def retrieval_from_parameters(dataset: xr.Dataset, 
+                              A: float, 
+                              B: float, 
+                              C: float, 
+                              wet_SI_thresh: float = 0, 
+                              freezing_snow_thresh: float = 2,
+                              wet_snow_thres: float = -2):
     """
     Retrieve snow depth with varied parameter set from an already pre-processed
     dataset.
@@ -201,7 +207,10 @@ def retrieval_from_parameters(dataset: xr.Dataset, A: float, B: float, C: float)
     dataset: xarray dataset with snow_depth variable calculated from parameters
     """
 
-    dataset = dataset[['s1','deltaVV','ims','fcf','lidar-sd']]
+    # dataset = dataset[['s1','deltaVV','ims','fcf','lidar-sd']]
+
+    # load datast to index
+    dataset = dataset.load()
 
     # calculate delta CR and delta VV
     dataset = calc_delta_cross_ratio(dataset, A = A)
@@ -219,11 +228,11 @@ def retrieval_from_parameters(dataset: xr.Dataset, A: float, B: float, C: float)
     dataset = calc_snow_index_to_snow_depth(dataset, C = C)
 
     # find newly wet snow
-    dataset = id_newly_wet_snow(dataset)
-    dataset = id_wet_negative_si(dataset)
+    dataset = id_newly_wet_snow(dataset, wet_thresh = wet_snow_thres)
+    dataset = id_wet_negative_si(dataset, wet_SI_thresh = wet_SI_thresh)
 
     # find newly frozen snow
-    dataset = id_newly_frozen_snow(dataset)
+    dataset = id_newly_frozen_snow(dataset, freeze_thresh =  freezing_snow_thresh)
 
     # make wet_snow flag
     dataset = flag_wet_snow(dataset)
