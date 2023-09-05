@@ -37,12 +37,12 @@ def id_newly_wet_snow(dataset: xr.Dataset, wet_thresh: int = -2, inplace: bool =
         dataset['wet_flag'] = xr.zeros_like(dataset['deltaVV'])
 
     # identify possible newly wet snow in regions FCF < 0.5 with deltaCR
-    dataset['wet_flag'] = dataset['wet_flag'].where(((dataset['fcf'] > 0.5) | (dataset['deltaCR'] > wet_thresh)), 1)
+    dataset['wet_flag'] = dataset['wet_flag'].where(((dataset['fcf'] > 0.5) | (dataset['deltaCR'] > wet_thresh) | (dataset['deltaCR'].isnull())), 1)
     # identify possible newly wet snow in regions FCF > 0.5 with deltaVV
-    dataset['wet_flag'] = dataset['wet_flag'].where(((dataset['fcf'] < 0.5) | (dataset['deltaVV'] > wet_thresh)), 1)
+    dataset['wet_flag'] = dataset['wet_flag'].where(((dataset['fcf'] < 0.5) | (dataset['deltaVV'] > wet_thresh) | (dataset['deltaVV'].isnull())), 1)
 
     # mask nans from Sentinel-1 data
-    dataset['wet_flag'] = dataset['wet_flag'].where(~dataset['deltaVV'].isnull())
+    dataset['wet_flag'] = dataset['wet_flag'].where(~dataset['s1'].sel(band = 'VV').isnull(),np.nan)
     
     if not inplace:
         return dataset
@@ -74,10 +74,10 @@ def id_newly_frozen_snow(dataset: xr.Dataset, freeze_thresh: int = 2, inplace: b
         dataset['freeze_flag'] = xr.zeros_like(dataset['deltaVV'])
 
     # identify possible re-freezing by increases of deltaGammaNaught of 2dB
-    dataset['freeze_flag'] = dataset['freeze_flag'].where(dataset['deltaGamma'] < freeze_thresh, 1)
+    dataset['freeze_flag'] = dataset['freeze_flag'].where((dataset['deltaGamma'] < freeze_thresh) | (dataset['deltaGamma'].isnull()), 1)
 
     # mask nans from Sentinel-1 data
-    dataset['freeze_flag'] = dataset['freeze_flag'].where(~dataset['deltaGamma'].isnull())
+    dataset['freeze_flag'] = dataset['freeze_flag'].where(~dataset['snow_index'].isnull())
 
     if not inplace:
         return dataset
@@ -109,10 +109,10 @@ def id_wet_negative_si(dataset: xr.Dataset, wet_SI_thresh = 0, inplace: bool = F
         dataset['alt_wet_flag'] = xr.zeros_like(dataset['deltaVV'])
 
     # identify wetting of snow by negative snow index with snow present
-    dataset['alt_wet_flag'] = dataset['alt_wet_flag'].where(((dataset['ims'] != 4) | (dataset['snow_index'] > wet_SI_thresh)), 1)
+    dataset['alt_wet_flag'] = dataset['alt_wet_flag'].where(((dataset['ims'] != 4) | (dataset['snow_index'] > wet_SI_thresh) | (dataset['snow_index'].isnull())), 1)
 
     # mask nans from Sentinel-1 data
-    dataset['alt_wet_flag'] = dataset['alt_wet_flag'].where(~dataset['deltaVV'].isnull())
+    dataset['alt_wet_flag'] = dataset['alt_wet_flag'].where(~dataset['snow_index'].isnull())
 
     if not inplace:
         return dataset
@@ -166,12 +166,12 @@ def flag_wet_snow(dataset: xr.Dataset, inplace: bool = False) -> Union[None, xr.
                 dataset['wet_snow'].loc[dict(time = ts)] = dataset.sel(time = prev_time)['wet_snow']
 
             # add newly wet snow flags to old wet snow and then bound at 1
-            dataset['wet_snow'].loc[dict(time = ts)]= dataset.sel(time = ts)['wet_snow'] + dataset.sel(time = ts)['wet_flag']
-            dataset['wet_snow'].loc[dict(time = ts)] = dataset.sel(time = ts)['wet_snow'] + dataset.sel(time = ts)['alt_wet_flag']
-            dataset['wet_snow'].loc[dict(time = ts)] = dataset.sel(time = ts)['wet_snow'].where(dataset.sel(time = ts)['wet_snow'] < 1, 1)
+            dataset['wet_snow'].loc[dict(time = ts)] = xr.where(~dataset.sel(time = ts)['wet_flag'].isnull(),dataset.sel(time = ts)['wet_snow'] + dataset.sel(time = ts)['wet_flag'],np.nan)
+            dataset['wet_snow'].loc[dict(time = ts)] = xr.where(~dataset.sel(time = ts)['alt_wet_flag'].isnull(),dataset.sel(time = ts)['wet_snow'] + dataset.sel(time = ts)['alt_wet_flag'],np.nan)
+            dataset['wet_snow'].loc[dict(time = ts)] = dataset.sel(time = ts)['wet_snow'].where((dataset.sel(time = ts)['wet_snow'] < 1) | (dataset.sel(time = ts)['wet_snow'].isnull()), 1)
             # add newly frozen snow flags to old wet snow and then bound at 0 to avoid negatives
-            dataset['wet_snow'].loc[dict(time = ts)] = dataset.sel(time = ts)['wet_snow'] - dataset.sel(time = ts)['freeze_flag']
-            dataset['wet_snow'].loc[dict(time = ts)] = dataset.sel(time = ts)['wet_snow'].where(dataset.sel(time = ts)['wet_snow'] > 0, 0)
+            dataset['wet_snow'].loc[dict(time = ts)] = xr.where(~dataset.sel(time = ts)['freeze_flag'].isnull(),dataset.sel(time = ts)['wet_snow'] - dataset.sel(time = ts)['freeze_flag'],np.nan)
+            dataset['wet_snow'].loc[dict(time = ts)] = dataset.sel(time = ts)['wet_snow'].where((dataset.sel(time = ts)['wet_snow'] > 0) | (dataset.sel(time = ts)['wet_snow'].isnull()), 0)
 
             dataset['wet_snow'].loc[dict(time = ts)] = dataset.sel(time = ts)['wet_snow'].where(~dataset['s1'].sel(time = ts, band = 'VV').isnull(), np.nan)
             prev_time = ts
@@ -201,7 +201,7 @@ def flag_wet_snow(dataset: xr.Dataset, inplace: bool = False) -> Union[None, xr.
         
         # now if we are over 1 (ie it was flagged wet by dB and negative SI flags) we should floor those back to 1
         dataset['perma_wet'].loc[dict(time = melt_orbit)] = \
-            dataset['perma_wet'].loc[dict(time = melt_orbit)].where(dataset['perma_wet'].loc[dict(time = melt_orbit)] <= 1 , 1)
+            dataset['perma_wet'].loc[dict(time = melt_orbit)].where((dataset['perma_wet'].loc[dict(time = melt_orbit)] <= 1) | (dataset['perma_wet'].loc[dict(time = melt_orbit)].isnull()) , 1)
         
         # now calculate the rolling mean of the perma wet so we have a % 0-1 of days out of 4 that were flagged
         dataset['perma_wet'].loc[dict(time = melt_orbit)] = \
@@ -210,6 +210,7 @@ def flag_wet_snow(dataset: xr.Dataset, inplace: bool = False) -> Union[None, xr.
         # then propogate forward so that if we get to > 50% in a 4 image window we mask the remained of the melt season
         # this will fail if bottleneck is installed due to it lacking the min_periods keyword
         # see: https://github.com/pydata/xarray/issues/4922
+
 
         if 'bottleneck' not in sys.modules:
             dataset['perma_wet'].loc[dict(time = melt_orbit)] = \
