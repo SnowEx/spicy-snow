@@ -184,6 +184,7 @@ class TestWetSnowFlags(unittest.TestCase):
         deltaVV = np.random.randn(10, 10, 6) * 3
         deltaCR = np.random.randn(10, 10, 6) * 3
         ims = np.full((10, 10, 6), 4, dtype = int)
+        s1 = np.random.randn(10, 10, 6, 3)
 
         # times = [np.datetime64(t) for t in ['2020-01-01','2020-01-02', '2020-01-07','2020-01-08', '2020-01-14', '2020-01-15']]
         # [24,1,24,1,24,1]
@@ -203,6 +204,7 @@ class TestWetSnowFlags(unittest.TestCase):
                         deltaVV = (["x", "y", "time"], deltaVV),
                         deltaCR = (["x", "y", "time"], deltaCR),
                         ims = (["x", "y", "time"], ims),
+                        s1 = (["x", "y", "time", "band"], s1)
                     ),
             coords = dict(
                         lon = (["x", "y"], lon),
@@ -266,6 +268,23 @@ class TestWetSnowFlags(unittest.TestCase):
         ds['alt_wet_flag'].loc[dict(time = ds.time[2], x = xi, y = yi)] = 0
         ds['freeze_flag'].loc[dict(time = ds.time[2], x = xi, y = yi)] = 0
 
+        # 3,3 is nans all along
+        xi , yi = 3, 3
+        ds['wet_flag'].loc[dict(time = ds.time[0], x = xi, y = yi)] = 0
+        ds['alt_wet_flag'].loc[dict(time = ds.time[0], x = xi, y = yi)] = 1
+        ds['freeze_flag'].loc[dict(time = ds.time[0], x = xi, y = yi)] = 0
+
+        ds['wet_flag'].loc[dict(time = ds.time[1], x = xi, y = yi)] = 0
+        ds['alt_wet_flag'].loc[dict(time = ds.time[1], x = xi, y = yi)] = 0
+        ds['freeze_flag'].loc[dict(time = ds.time[1], x = xi, y = yi)] = 1
+
+        ds['wet_flag'].loc[dict(time = ds.time[2], x = xi, y = yi)] = 1
+        ds['alt_wet_flag'].loc[dict(time = ds.time[2], x = xi, y = yi)] = 0
+        ds['freeze_flag'].loc[dict(time = ds.time[2], x = xi, y = yi)] = 0
+
+        for t in ds.time:
+            ds['s1'].loc[dict(time = t, x = xi, y = yi, band = 'VV')] = np.nan
+
         ds = flag_wet_snow(ds)
 
         # 0,0 is wet @ t0, dry @ t1, dry @ t 2
@@ -286,6 +305,12 @@ class TestWetSnowFlags(unittest.TestCase):
         self.assertEqual( ds['wet_snow'].loc[dict(time = ds.time[1], x = xi, y = yi)], 0)
         self.assertEqual( ds['wet_snow'].loc[dict(time = ds.time[2], x = xi, y = yi)], 1)
 
+        # 3, 3 is nans all along
+        xi , yi = 3, 3
+        self.assertTrue(np.isnan(ds['wet_snow'].loc[dict(time = ds.time[0], x = xi, y = yi)].values))
+        self.assertTrue(np.isnan(ds['wet_snow'].loc[dict(time = ds.time[1], x = xi, y = yi)].values))
+        self.assertTrue(np.isnan(ds['wet_snow'].loc[dict(time = ds.time[2], x = xi, y = yi)].values))
+
     def test_id_wet_multiple_orbit(self):
 
         fcf = np.random.randn(10, 10)/10 + 0.5
@@ -294,6 +319,8 @@ class TestWetSnowFlags(unittest.TestCase):
         deltaVV = np.random.randn(10, 10, n) + 0.1
         deltaCR = np.random.randn(10, 10, n) + 0.1
         ims = np.full((10, 10, n), 4, dtype = int)
+        s1 = np.random.randn(10, 10, n, 3)
+
 
         x = np.linspace(0, 9, 10)
         y = np.linspace(10, 19, 10)
@@ -306,6 +333,7 @@ class TestWetSnowFlags(unittest.TestCase):
                         deltaVV = (["x", "y", "time"], deltaVV),
                         deltaCR = (["x", "y", "time"], deltaCR),
                         ims = (["x", "y", "time"], ims),
+                        s1 = (["x", "y", "time", "band"], s1)
                     ),
             coords = dict(
                         lon = (["x", "y"], lon),
@@ -474,6 +502,7 @@ class TestWetSnowFlags(unittest.TestCase):
         wet_flag = np.full((10, 10, n), 0.0)
         alt_wet_flag = np.full((10, 10, n), 0.0)
         freeze_flag = np.full((10, 10, n), 0.0)
+        s1 = np.random.randn(10, 10, n, 3)
 
         x = np.linspace(0, 9, 10)
         y = np.linspace(10, 19, 10)
@@ -486,11 +515,13 @@ class TestWetSnowFlags(unittest.TestCase):
                         wet_flag = (["x", "y", "time"], wet_flag),
                         alt_wet_flag = (["x", "y", "time"], alt_wet_flag),
                         freeze_flag = (["x", "y", "time"], freeze_flag),
+                        s1 = (["x", "y", "time", "band"], s1)
                     ),
             coords = dict(
                         lon = (["x", "y"], lon),
                         lat = (["x", "y"], lat),
                         time = times,
+                        band = ["VV", "VH", "inc"],
                         relative_orbit = (["time"], ros)) 
         )
 
@@ -516,8 +547,6 @@ class TestWetSnowFlags(unittest.TestCase):
         ds['alt_wet_flag'].loc[dict(time = t, x = xi, y = yi)] = 0
         ds['freeze_flag'].loc[dict(time = t, x = xi, y = yi)] = 1
 
-
-
         t = ds.time[11]
         ds['wet_flag'].loc[dict(time = t, x = xi, y = yi)] = 0
         ds['alt_wet_flag'].loc[dict(time = t, x = xi, y = yi)] = 1
@@ -532,6 +561,14 @@ class TestWetSnowFlags(unittest.TestCase):
         ds['wet_flag'].loc[dict(time = t, x = xi, y = yi)] = 0
         ds['alt_wet_flag'].loc[dict(time = t, x = xi, y = yi)] = 0
         ds['freeze_flag'].loc[dict(time = t, x = xi, y = yi)] = 1
+
+        # set one to nan and be sure it is nan for perma wet
+        t = ds.time[15]
+        xi , yi = 4 ,4 
+        ds['wet_flag'].loc[dict(time = t, x = xi, y = yi)] = 0
+        ds['alt_wet_flag'].loc[dict(time = t, x = xi, y = yi)] = 0
+        ds['freeze_flag'].loc[dict(time = t, x = xi, y = yi)] = 1
+        ds['s1'].loc[dict(time = t, x = xi, y = yi, band = 'VV')] = np.nan
 
         ds = flag_wet_snow(ds)
 
@@ -568,6 +605,8 @@ class TestWetSnowFlags(unittest.TestCase):
         self.assertEqual(ds['wet_snow'].sel(time = ds.time[3]).loc[dict(x = 3, y = 3)], 1)
         self.assertEqual(ds['wet_snow'].sel(time = ds.time[5]).loc[dict(x = 3, y = 3)], 0)
         self.assertEqual(ds['wet_snow'].sel(time = ds.time[7]).loc[dict(x = 3, y = 3)], 0)
+
+        self.assertTrue(np.isnan(ds['wet_snow'].loc[dict(time = ds.time[15], x = 4, y = 4)].values))
         
 if __name__ == '__main__':
     unittest.main()
