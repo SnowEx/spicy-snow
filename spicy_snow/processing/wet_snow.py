@@ -77,7 +77,7 @@ def id_newly_frozen_snow(dataset: xr.Dataset, freeze_thresh: int = 2, inplace: b
     dataset['freeze_flag'] = dataset['freeze_flag'].where(dataset['deltaGamma'] < freeze_thresh, 1)
 
     # mask nans from Sentinel-1 data
-    dataset['freeze_flag'] = dataset['freeze_flag'].where(~dataset['deltaVV'].isnull())
+    dataset['freeze_flag'] = dataset['freeze_flag'].where(~dataset['deltaGamma'].isnull())
 
     if not inplace:
         return dataset
