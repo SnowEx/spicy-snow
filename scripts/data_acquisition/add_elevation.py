@@ -7,4 +7,5 @@ for fp in files:
     ds = xr.load_dataset(fp)
     dem = py3dep.get_dem(ds.rio.bounds(), 30)
     ds['dem'] = dem.drop(['band', 'spatial_ref']).interp_like(ds)
+    ds = ds.drop('lidar-dem')
     ds.to_netcdf(fp.with_suffix('.fix.nc'))

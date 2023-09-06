@@ -21,6 +21,7 @@ class TestWetSnowFlags(unittest.TestCase):
     fcf = np.random.randn(10, 10)/10 + 0.5
     deltaVV = np.random.randn(10, 10, 6) * 3
     deltaCR = np.random.randn(10, 10, 6) * 3
+    s1 = np.random.randn(10, 10, 6, 3)
     ims = np.full((10, 10, 6), 4, dtype = int)
     times = [np.datetime64(t) for t in ['2020-01-01','2020-01-02', '2020-01-07','2020-01-08', '2020-01-14', '2020-01-15']]
     x = np.linspace(0, 9, 10)
@@ -32,6 +33,7 @@ class TestWetSnowFlags(unittest.TestCase):
                 deltaVV = (["x", "y", "time"], deltaVV),
                 deltaCR = (["x", "y", "time"], deltaCR),
                 ims = (["x", "y", "time"], ims),
+                s1 = (["x", "y", "time", "band"], s1)
             ),
        coords = dict(
                 lon = (["x", "y"], lon),
