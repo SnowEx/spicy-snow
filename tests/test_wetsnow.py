@@ -505,6 +505,7 @@ class TestWetSnowFlags(unittest.TestCase):
         alt_wet_flag = np.full((10, 10, n), 0.0)
         freeze_flag = np.full((10, 10, n), 0.0)
         s1 = np.random.randn(10, 10, n, 3)
+        ims = np.full((10, 10, n), 4, dtype = int)
 
         x = np.linspace(0, 9, 10)
         y = np.linspace(10, 19, 10)
@@ -517,7 +518,8 @@ class TestWetSnowFlags(unittest.TestCase):
                         wet_flag = (["x", "y", "time"], wet_flag),
                         alt_wet_flag = (["x", "y", "time"], alt_wet_flag),
                         freeze_flag = (["x", "y", "time"], freeze_flag),
-                        s1 = (["x", "y", "time", "band"], s1)
+                        s1 = (["x", "y", "time", "band"], s1),
+                        ims = (["x", "y", "time"], ims)
                     ),
             coords = dict(
                         lon = (["x", "y"], lon),
