@@ -20,30 +20,32 @@ from spicy_snow.processing.snow_index import calc_delta_cross_ratio, calc_delta_
 from spicy_snow.processing.wet_snow import id_newly_wet_snow, id_wet_negative_si, \
     id_newly_frozen_snow, flag_wet_snow
 
-def get_numpy(x, y):
+def get_idx(x, y, z, q):
     # ravel to numpy arrays
     x = x.values.ravel()
     y = y.values.ravel()
+    z = z.values.ravel()
+    q = q.values.ravel()
 
-    # remove nans
-    x, y = x[(~np.isnan(x)) & (~np.isnan(y))], y[(~np.isnan(x)) & (~np.isnan(y))]
-
-    return x, y
+    # find non nans
+    id = (~np.isnan(x)) & (~np.isnan(y)) & (~np.isnan(z)) & (~np.isnan(q))
+    return id
 
 # Create parameter space
 A = np.round(np.arange(1, 3.1, 0.5), 2)
 B = np.round(np.arange(0, 1.01, 0.1), 2)
 C = np.round(np.arange(0, 1.001, 0.01), 2)
 
-files = Path('/bsuhome/zacharykeskinen/spicy-snow/Lidar_s1_stacks/').glob('*.nc')
+files = Path('/bsuhome/zacharykeskinen/spicy-snow/Lidar_s1_stacks/').glob('*fix.nc')
 
-param_dir = Path('~/scratch/param_regional').expanduser()
+param_dir = Path('~/scratch/param_regional_v2').expanduser()
+param_dir.mkdir(exist_ok = True)
 for f in files:
     # get dataset
     ds_name = f.name.split('stacks/')[-1].split('.')[0]
     print(datetime.now(), f' -- starting {ds_name}')
     ds_ = xr.open_dataset(f).load()
-    dataset = ds_[['s1','deltaVV','ims','fcf', 'lidar-sd']]
+    dataset = ds_[['s1','deltaVV','ims','fcf', 'lidar-sd', 'dem']]
 
     # find closest timestep to lidar
     td = abs(pd.to_datetime(dataset.time) - pd.to_datetime(dataset.attrs['lidar-flight-time']))
@@ -73,11 +75,16 @@ for f in files:
 
                 ds = calc_snow_index_to_snow_depth(ds, C = c)
 
-                sub = ds.sel(time = closest_ts)[['snow_depth', 'lidar-sd']]
-                spicy_sd, _ = get_numpy(sub['snow_depth'], sub['lidar-sd'])
+                sub = ds.sel(time = closest_ts)[['snow_depth', 'lidar-sd', 'fcf', 'dem']]
+                id = get_idx(sub['snow_depth'], sub['lidar-sd'], sub['fcf'], sub['dem'])
+                spicy_sd = sub['snow_depth'].values.ravel()[id]
                 # param_np = np.vstack([spicy_sd, spicy_wet])
                 np.save(param_dir.joinpath(ds_name, f'{a}_{b}_{c}.npy'), spicy_sd)
 
                 if not param_dir.joinpath(ds_name, 'lidar.npy').exists():
-                    _, lidar_sd = get_numpy(sub['snow_depth'], sub['lidar-sd'])
+                    lidar_sd = sub['lidar-sd'].values.ravel()[id]
                     np.save(param_dir.joinpath(ds_name, f'lidar.npy'), lidar_sd)
+                    fcf = sub['fcf'].values.ravel()[id]
+                    np.save(param_dir.joinpath(ds_name, f'fcf.npy'), fcf)
+                    dem = sub['dem'].values.ravel()[id]
+                    np.save(param_dir.joinpath(ds_name, f'dem.npy'), dem)
