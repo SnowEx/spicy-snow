@@ -191,7 +191,7 @@ def retrieval_from_parameters(dataset: xr.Dataset,
                               C: float, 
                               wet_SI_thresh: float = 0, 
                               freezing_snow_thresh: float = 2,
-                              wet_snow_thres: float = -2):
+                              wet_snow_thresh: float = -2):
     """
     Retrieve snow depth with varied parameter set from an already pre-processed
     dataset.
@@ -228,7 +228,7 @@ def retrieval_from_parameters(dataset: xr.Dataset,
     dataset = calc_snow_index_to_snow_depth(dataset, C = C)
 
     # find newly wet snow
-    dataset = id_newly_wet_snow(dataset, wet_thresh = wet_snow_thres)
+    dataset = id_newly_wet_snow(dataset, wet_thresh = wet_snow_thresh)
     dataset = id_wet_negative_si(dataset, wet_SI_thresh = wet_SI_thresh)
 
     # find newly frozen snow
