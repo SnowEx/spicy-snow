@@ -22,7 +22,8 @@ from spicy_snow.download.snow_cover import download_snow_cover
 
 # import functions for pre-processing
 from spicy_snow.processing.s1_preprocessing import merge_partial_s1_images, s1_orbit_averaging,\
-s1_clip_outliers, subset_s1_images, ims_water_mask, s1_incidence_angle_masking, merge_s1_subsets
+s1_clip_outliers, subset_s1_images, ims_water_mask, s1_incidence_angle_masking, merge_s1_subsets, \
+add_confidence_angle
 
 # import the functions for snow_index calculation
 from spicy_snow.processing.snow_index import calc_delta_VV, calc_delta_cross_ratio, \
@@ -139,6 +140,9 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
     
     # recombine subsets
     ds = merge_s1_subsets(dict_ds)
+
+    # calculate confidence interval
+    ds = add_confidence_angle(ds)
 
     ## Snow Index Steps
     log.info("Calculating snow index")
