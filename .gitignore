@@ -163,3 +163,5 @@ scripts/optimize/param_sds
 !/contrib/palomaki/*.csv
 
 *.sqlite
+
+*.nfs
