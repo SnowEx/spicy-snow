@@ -46,7 +46,7 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
                         wet_snow_thresh: float = -2,
                         freezing_snow_thresh: float = 1,
                         wet_SI_thresh: float = 0,
-                        outfp: Union[str, bool] = False,
+                        outfp: Union[str, Path, bool] = False,
                         params: List[float] = [2.5, 0.2, 0.55]) -> xr.Dataset:
     """
     Finds, downloads Sentinel-1, forest cover, water mask (not implemented), and 
@@ -86,6 +86,10 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
     assert isinstance(params, list) or isinstance(params, tuple), f"param keyword must be list or tuple. Got {type(params)}"
     assert len(params) == 3, f"List of params must be 3 in order A, B, C. Got {params}"
     A, B, C = params
+
+    if type(outfp) != bool:
+        outfp = Path(outfp).expanduser().resolve()
+        assert outfp.parent.exists(), f"Out filepath {outfp}'s directory does not exist"
 
     ## set up directories and logging
 
