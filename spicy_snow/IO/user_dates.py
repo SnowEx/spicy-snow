@@ -29,7 +29,7 @@ def get_input_dates(date2: Union[str, pd.Timestamp, np.datetime64],
 
         date2 = pd.to_datetime(date2)
 
-        assert date2.year > 2016, f"Please enter a date after 2016 for s1 coverage.\
+        assert date2.year > 2014, f"Please enter a date after 2016 for s1 coverage.\
             Current parsed date is {date2}"
         
         assert date2 < datetime.now(), f"Please enter a date in the past"
