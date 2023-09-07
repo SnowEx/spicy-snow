@@ -106,6 +106,9 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
     search_results = s1_img_search(area, dates)
     log.info(f'Found {len(search_results)} results')
 
+    assert len(search_results) > 3, f"Need at least 4 images to run. Found {len(search_results)} \
+    using area: {area} and dates: {dates}."
+
     # download s1 images into dataset ['s1'] variable name
     jobs = hyp3_pipeline(search_results, job_name = job_name, existing_job_name = existing_job_name)
     imgs = download_hyp3(jobs, area, outdir = join(work_dir, 'tmp'), clean = False)
