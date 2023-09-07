@@ -22,7 +22,8 @@ from spicy_snow.download.snow_cover import download_snow_cover
 
 # import functions for pre-processing
 from spicy_snow.processing.s1_preprocessing import merge_partial_s1_images, s1_orbit_averaging,\
-s1_clip_outliers, subset_s1_images, ims_water_mask, s1_incidence_angle_masking, merge_s1_subsets
+s1_clip_outliers, subset_s1_images, ims_water_mask, s1_incidence_angle_masking, merge_s1_subsets, \
+add_confidence_angle
 
 # import the functions for snow_index calculation
 from spicy_snow.processing.snow_index import calc_delta_VV, calc_delta_cross_ratio, \
@@ -43,7 +44,7 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
                         debug: bool = False,
                         ims_masking: bool = True,
                         wet_snow_thresh: float = -2,
-                        freezing_snow_thresh: float = 2,
+                        freezing_snow_thresh: float = 1,
                         wet_SI_thresh: float = 0,
                         outfp: Union[str, bool] = False,
                         params: List[float] = [2.5, 0.2, 0.55]) -> xr.Dataset:
@@ -140,6 +141,9 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
     # recombine subsets
     ds = merge_s1_subsets(dict_ds)
 
+    # calculate confidence interval
+    ds = add_confidence_angle(ds)
+
     ## Snow Index Steps
     log.info("Calculating snow index")
     # calculate delta CR and delta VV
@@ -191,7 +195,7 @@ def retrieval_from_parameters(dataset: xr.Dataset,
                               C: float, 
                               wet_SI_thresh: float = 0, 
                               freezing_snow_thresh: float = 2,
-                              wet_snow_thres: float = -2):
+                              wet_snow_thresh: float = -2):
     """
     Retrieve snow depth with varied parameter set from an already pre-processed
     dataset.
@@ -228,7 +232,7 @@ def retrieval_from_parameters(dataset: xr.Dataset,
     dataset = calc_snow_index_to_snow_depth(dataset, C = C)
 
     # find newly wet snow
-    dataset = id_newly_wet_snow(dataset, wet_thresh = wet_snow_thres)
+    dataset = id_newly_wet_snow(dataset, wet_thresh = wet_snow_thresh)
     dataset = id_wet_negative_si(dataset, wet_SI_thresh = wet_SI_thresh)
 
     # find newly frozen snow
