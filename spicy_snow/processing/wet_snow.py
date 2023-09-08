@@ -239,6 +239,6 @@ def flag_wet_snow(dataset: xr.Dataset, inplace: bool = False) -> Union[None, xr.
     # if less than 50% are wet then keep the save value for wet_snow otherwise set to 1
     dataset['wet_snow'] = dataset['wet_snow'].where(dataset['perma_wet'] < 0.5, 1)
 
-    # dataset['wet_snow'].loc[dict(time = ts)] = dataset.sel(time = ts)['wet_snow'].where(dataset.sel(time = ts)['ims'] == 4, 0)
+    dataset['wet_snow'].loc[dict(time = ts)] = dataset.sel(time = ts)['wet_snow'].where(dataset.sel(time = ts)['ims'] == 4, 0)
 
     return dataset
