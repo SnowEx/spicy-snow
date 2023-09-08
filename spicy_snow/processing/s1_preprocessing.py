@@ -292,3 +292,28 @@ def merge_s1_subsets(dataset_dictionary: Dict[str, xr.Dataset]) -> xr.Dataset:
 
     return dataset
 
+def add_confidence_angle(dataset: xr.Dataset, inplace: bool = False):
+    """
+    Function to add confidence angle to dataset.
+
+    Confidence Angle = angle[ abs(dVH/dt / mean(dVH/dt)), abs(dVV/dt / mean(dVV/dt)) ]
+
+    Args:
+    dataset: Xarray Dataset of sentinel images to add confidence angle to
+    inplace: boolean flag to modify original Dataset or return a new Dataset
+
+    Returns:
+    dataset: Xarray dataset of sentinel image with confidence interval in 
+    """
+    ds_amp = s1_dB_to_power(dataset).copy()
+    ds_amp['deltaVH_amp'] = ds_amp['s1'].sel(band = 'VH').diff(1)
+    ds_amp['deltaVV_amp'] = ds_amp['s1'].sel(band = 'VV').diff(1)
+
+    ds_amp['deltaVH_norm'] = np.abs(ds_amp['deltaVH_amp'] / ds_amp['deltaVH_amp'].mean())
+    ds_amp['deltaVV_norm'] = np.abs(ds_amp['deltaVV_amp'] / ds_amp['deltaVV_amp'].mean())
+
+    ds_amp['confidence'] = (ds_amp['deltaVH_norm'].dims, np.angle(ds_amp['deltaVV_norm'].values + ds_amp['deltaVH_norm'].values * 1j))
+    dataset['confidence'] = ds_amp['confidence'].mean('time')
+
+    if not inplace:
+        return dataset

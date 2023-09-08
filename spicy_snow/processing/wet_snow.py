@@ -227,13 +227,18 @@ def flag_wet_snow(dataset: xr.Dataset, inplace: bool = False) -> Union[None, xr.
             dataset['perma_wet'].loc[dict(time = melt_orbit)] = \
                 dataset['perma_wet'].loc[dict(time = melt_orbit)].rolling(time = len(orbit_dataset.time)).max()
 
-
+        # set perma wet to nans if no S1 data
         dataset['perma_wet'].loc[dict(time = melt_orbit)] = dataset.sel(dict(time = melt_orbit))['perma_wet'].where(~dataset['s1'].sel(dict(time = melt_orbit, band = 'VV')).isnull(), np.nan)
+
+        # set perma wet to 0 if no snow in IMS
+        dataset['perma_wet'].loc[dict(time = melt_orbit)] = dataset.sel(dict(time = melt_orbit))['perma_wet'].where(dataset['ims'].sel(dict(time = melt_orbit)) == 4, 0)
 
     # if we have no data just set it to not be flagged perma_wet
     dataset['perma_wet'] = dataset['perma_wet'].where(~dataset['perma_wet'].isnull(), 0)
 
     # if less than 50% are wet then keep the save value for wet_snow otherwise set to 1
     dataset['wet_snow'] = dataset['wet_snow'].where(dataset['perma_wet'] < 0.5, 1)
+
+    dataset['wet_snow'].loc[dict(time = ts)] = dataset.sel(time = ts)['wet_snow'].where(dataset.sel(time = ts)['ims'] == 4, 0)
 
     return dataset

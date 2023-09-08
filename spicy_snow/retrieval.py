@@ -22,7 +22,8 @@ from spicy_snow.download.snow_cover import download_snow_cover
 
 # import functions for pre-processing
 from spicy_snow.processing.s1_preprocessing import merge_partial_s1_images, s1_orbit_averaging,\
-s1_clip_outliers, subset_s1_images, ims_water_mask, s1_incidence_angle_masking, merge_s1_subsets
+s1_clip_outliers, subset_s1_images, ims_water_mask, s1_incidence_angle_masking, merge_s1_subsets, \
+add_confidence_angle
 
 # import the functions for snow_index calculation
 from spicy_snow.processing.snow_index import calc_delta_VV, calc_delta_cross_ratio, \
@@ -43,7 +44,7 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
                         debug: bool = False,
                         ims_masking: bool = True,
                         wet_snow_thresh: float = -2,
-                        freezing_snow_thresh: float = 2,
+                        freezing_snow_thresh: float = 1,
                         wet_SI_thresh: float = 0,
                         outfp: Union[str, bool] = False,
                         params: List[float] = [2.5, 0.2, 0.55]) -> xr.Dataset:
@@ -105,6 +106,9 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
     search_results = s1_img_search(area, dates)
     log.info(f'Found {len(search_results)} results')
 
+    assert len(search_results) > 3, f"Need at least 4 images to run. Found {len(search_results)} \
+    using area: {area} and dates: {dates}."
+
     # download s1 images into dataset ['s1'] variable name
     jobs = hyp3_pipeline(search_results, job_name = job_name, existing_job_name = existing_job_name)
     imgs = download_hyp3(jobs, area, outdir = join(work_dir, 'tmp'), clean = False)
@@ -139,6 +143,9 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
     
     # recombine subsets
     ds = merge_s1_subsets(dict_ds)
+
+    # calculate confidence interval
+    ds = add_confidence_angle(ds)
 
     ## Snow Index Steps
     log.info("Calculating snow index")
