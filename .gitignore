@@ -164,4 +164,4 @@ scripts/optimize/param_sds
 
 *.sqlite
 
-*.nfs
+*.nfs*
