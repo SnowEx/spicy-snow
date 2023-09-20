@@ -46,7 +46,7 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
                         wet_snow_thresh: float = -2,
                         freezing_snow_thresh: float = 1,
                         wet_SI_thresh: float = 0,
-                        outfp: Union[str, bool] = False,
+                        outfp: Union[str, Path, bool] = False,
                         params: List[float] = [2.5, 0.2, 0.55]) -> xr.Dataset:
     """
     Finds, downloads Sentinel-1, forest cover, water mask (not implemented), and 
@@ -87,6 +87,10 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
     assert len(params) == 3, f"List of params must be 3 in order A, B, C. Got {params}"
     A, B, C = params
 
+    if type(outfp) != bool:
+        outfp = Path(outfp).expanduser().resolve()
+        assert outfp.parent.exists(), f"Out filepath {outfp}'s directory does not exist"
+
     ## set up directories and logging
 
     os.makedirs(work_dir, exist_ok = True)
@@ -105,6 +109,9 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
     # get asf_search search results
     search_results = s1_img_search(area, dates)
     log.info(f'Found {len(search_results)} results')
+
+    assert len(search_results) > 3, f"Need at least 4 images to run. Found {len(search_results)} \
+    using area: {area} and dates: {dates}."
 
     # download s1 images into dataset ['s1'] variable name
     jobs = hyp3_pipeline(search_results, job_name = job_name, existing_job_name = existing_job_name)

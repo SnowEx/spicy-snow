@@ -37,7 +37,7 @@ class TestIoHelperFunctions(unittest.TestCase):
 
         self.assertRaises(AssertionError, get_input_dates , '2128-01-01')
 
-        self.assertRaises(AssertionError, get_input_dates , '2015-01-01')
+        self.assertRaises(AssertionError, get_input_dates , '2013-01-01')
 
         self.assertRaises(AssertionError, get_input_dates , '2017-01-01', '2018-01-01')
     
