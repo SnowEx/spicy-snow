@@ -119,8 +119,8 @@ def hyp3_pipeline(search_results: pd.DataFrame, job_name, existing_job_name: Uni
         return rtc_jobs.filter_jobs(succeeded = True)
     
     # check if you have passed quota
-    quota = hyp3.check_quota()
-    if not quota or len(search_results) > hyp3.check_quota():
+    quota = hyp3.check_credits()
+    if not quota or len(search_results) > quota:
         log.warn(f'More search results ({len(search_results)}) than quota ({quota}).')
         resp = None
         while resp not in ['Y', 'N']:
