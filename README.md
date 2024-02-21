@@ -108,7 +108,7 @@ Title image: https://openai.com/dall-e-2/
 
 ## Contact
 
-Zach Hoppinen: zacharykeskinen@boisestate.edu
+Zach Hoppinen: zacharyhoppinen@u.boisestate.edu
 
 Project Link: https://github.com/SnowEx/spicy-snow
 
