@@ -74,11 +74,11 @@ for lon_min, lat_min in product(range(-117, -113), range(43, 46)):
 
 Description of the output netcdf variables.
 
-wet_snow: layer showing layers flagged as wet snow (1 = wet, 0 = dry)
-snow_depth: derived snow depth in meters
-ims: snow coverage binary mask (2 = no snow, 4 = snow)
-fcf: forest coverage percentage
-s1: raw sentinel-1 with 3 bands for VV, VH backscatter in dB and incidence angle
+ - wet_snow: layer showing layers flagged as wet snow (1 = wet, 0 = dry)
+ - snow_depth: derived snow depth in meters
+ - ims: snow coverage binary mask (2 = no snow, 4 = snow)
+ - fcf: forest coverage percentage
+ - s1: raw sentinel-1 with 3 bands for VV, VH backscatter in dB and incidence angle
 All the other layers are intermediate layers for if you want to explore the processing pipeline.
 
 ## Contributing
