@@ -79,6 +79,7 @@ Description of the output netcdf variables.
  - ims: snow coverage binary mask (2 = no snow, 4 = snow)
  - fcf: forest coverage percentage
  - s1: raw sentinel-1 with 3 bands for VV, VH backscatter in dB and incidence angle
+
 All the other layers are intermediate layers for if you want to explore the processing pipeline.
 
 ## Contributing
