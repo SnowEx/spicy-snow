@@ -1,3 +1,7 @@
+This branch contains all original scripts and notebooks before cleanup after publication of the 2024 Cryosphere Paper. Feel free to branch from here if you need legacy versions.
+
+https://egusphere.copernicus.org/preprints/2024/egusphere-2024-1018/
+
 [![MIT License][license-shield]][license-url]
 [![PIP](https://img.shields.io/badge/pip-0.1.3-purple)](https://img.shields.io/badge/pip-0.1.3-purple)
 [![COVERAGE](https://img.shields.io/badge/coverage-86%25-green)](https://img.shields.io/badge/coverage-86%25-green) 
