@@ -165,3 +165,6 @@ scripts/optimize/param_sds
 *.sqlite
 
 *.nfs*
+
+.vscode/
+local/
