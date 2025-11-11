@@ -30,8 +30,8 @@ from setuptools import find_packages, setup, Command
 NAME = 'spicy-snow'
 DESCRIPTION = 'Snow Depth Retrievals from Sentinel-1 Backscatter.'
 URL = 'https://github.com/SnowEx/spicy-snow'
-EMAIL = 'zachkeskinen@gmail.com'
-AUTHOR = 'Zach Keskinen'
+EMAIL = 'zachhoppinen@gmail.com'
+AUTHOR = 'Zach Hoppinen'
 REQUIRES_PYTHON = '>=3.9.0'
 VERSION = '0.0.1'
 
