@@ -13,6 +13,8 @@ Lievens et al 2019 - https://www.nature.com/articles/s41467-019-12566-y
 
 Lievens et al 2021 - https://tc.copernicus.org/articles/16/159/2022/
 
+Hoppinen et al 2024 - https://egusphere.copernicus.org/preprints/2024/egusphere-2024-1018/
+
 <img src="https://github.com/SnowEx/spicy-snow/blob/main/title-img.png" width="800">
 
 ## Example Installation
