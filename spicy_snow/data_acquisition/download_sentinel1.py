@@ -100,37 +100,3 @@ def download_images(urls, out_directory, reprocess=False, retries = 3):
         download_fps.append(out_fp)
     
     return download_fps
-
-def map_files_to_asf_properties(file_list, search_df):
-    """
-    Map local files to the corresponding ASF search results row based on filename stem.
-
-    Usage:
-        fps_properties = map_files_to_asf_properties(fps, search_df)
-    Args:
-        file_list (list[Path]): List of local downloaded files.
-        search_df (pd.DataFrame): ASF search results.
-
-    Returns:
-        dict: mapping Path -> row (as Series) from search_df
-    """
-    # precompute list of URL stems for faster lookup
-    url_stems_list = [
-        [Path(url).stem for url in row.get('properties.additionalUrls', [])] +
-        [Path(row.get('properties.url')).stem]  # also include main URL
-        for _, row in search_df.iterrows()
-    ]
-
-    file_to_row = {}
-    for fp in file_list:
-        stem = fp.stem
-        # find matching row
-        for i, stems in enumerate(url_stems_list):
-            if stem in stems:
-                file_to_row[fp] = search_df.iloc[i]
-                break
-        else:
-            # no match
-            file_to_row[fp] = None
-
-    return file_to_row

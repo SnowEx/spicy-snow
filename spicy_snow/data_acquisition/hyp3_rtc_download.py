@@ -1,4 +1,6 @@
 """
+Legacy code kept from previous hyp3 pipeline.
+
 Functions to search and download Sentinel-1 images for specific geometries and dates
 """
 
