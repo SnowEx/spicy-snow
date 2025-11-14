@@ -14,7 +14,7 @@ sys.path.append(expanduser('../'))
 
 from spicy_snow.retrieval import retrieve_snow_depth
 
-from spicy_snow.data_acquisition.snowex_lidar import download_dem, download_snow_depth,\
+from spicy_snow.legacy.snowex_lidar import download_dem, download_snow_depth,\
       download_veg_height, make_site_ds
 
 lidar_dir = '/bsuhome/zacharykeskinen/scratch/lidar'
