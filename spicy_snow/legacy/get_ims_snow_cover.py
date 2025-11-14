@@ -6,8 +6,6 @@ https://nsidc.org/data/user-resources/help-center/how-access-data-using-ftp-clie
 """
 
 import sys
-import os
-from os.path import basename, exists, expanduser, join
 import shutil
 from datetime import datetime
 import urllib.request
@@ -22,8 +20,9 @@ import rioxarray as rxa
 import logging
 log = logging.getLogger(__name__)
 
-sys.path.append(expanduser('~/Documents/spicy-snow'))
 from spicy_snow.utils.download import url_download, decompress
+
+
 
 def get_ims_day_data(year: str, doy: str, tmp_dir: str) -> xr.DataArray:
     """

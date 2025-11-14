@@ -62,8 +62,12 @@ def download_fcf(dataset: xr.Dataset, fcf_fp: str) -> xr.Dataset:
     log.debug("Downloading Forest Cover")
 
     # first check if in us
-    if not within_conus(dataset): fcf = download_proba_v(fcf_fp)
-    else: fcf = download_nlcd(dataset)
+    if not within_conus(dataset): 
+        log.info(f'AOI outside of CONUS. Using Proba-V datasets')
+        fcf = download_proba_v(fcf_fp)
+    else: 
+        log.info(f'AOI inside of CONUS. NLCD 2021 Forest Cover')
+        fcf = download_nlcd(dataset)
 
     # reproject FCF and clip to match dataset
     log.debug(f"Clipping FCF to {dataset['s1'].rio.bounds()}")
