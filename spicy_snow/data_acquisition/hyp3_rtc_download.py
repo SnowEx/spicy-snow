@@ -28,7 +28,9 @@ from spicy_snow.processing.s1_preprocessing import s1_power_to_dB
 import logging
 log = logging.getLogger(__name__)
 
-def s1_img_search(area: shapely.geometry.Polygon, dates: Tuple[str, str]) -> pd.DataFrame:
+
+
+def s1_hyp3_search(area: shapely.geometry.Polygon, dates: Tuple[str, str]) -> pd.DataFrame:
     """
     find dates and url of Sentinel-1 overpasses
 
@@ -56,6 +58,7 @@ def s1_img_search(area: shapely.geometry.Polygon, dates: Tuple[str, str]) -> pd.
     if area.bounds[3] > 90 or area.bounds[1] < 0 or area.bounds[2] > 180\
         or area.bounds[0] < -180:
         raise IndexError("Coordinates must be between 0-90N and -180-180")
+    # TODO warnings for period of only s1b, when s1c started injestion on May 20th 2025
 
     # get results from asf_search in date range and geometry
     results = asf.geo_search(platform = [asf.PLATFORM.SENTINEL1], intersectsWith = area.wkt,\

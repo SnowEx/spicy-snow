@@ -9,9 +9,9 @@ from os.path import expanduser
 sys.path.append(expanduser('../'))
 
 # import modules
-from spicy_snow.download.sentinel1 import s1_img_search, download_s1_imgs
-from spicy_snow.download.forest_cover import download_fcf, add_fcf
-from spicy_snow.download.snow_cover import download_snow_cover
+from spicy_snow.data_acquisition.find_sentinel1 import s1_img_search, download_s1_imgs
+from spicy_snow.data_acquisition.forest_cover import download_fcf, add_fcf
+from spicy_snow.data_acquisition.snow_cover import download_snow_cover
 
 # sets dates and areas
 dates = ('2019-02-01', '2019-02-25')

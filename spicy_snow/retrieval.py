@@ -16,9 +16,9 @@ from os.path import expanduser
 sys.path.append(expanduser('../'))
 
 # import functions for downloading
-from spicy_snow.download.sentinel1 import s1_img_search, hyp3_pipeline, download_hyp3, combine_s1_images
-from spicy_snow.download.forest_cover import download_fcf
-from spicy_snow.download.snow_cover import download_snow_cover
+from spicy_snow.data_acquisition.find_sentinel1 import s1_img_search, hyp3_pipeline, download_hyp3, combine_s1_images
+from spicy_snow.data_acquisition.forest_cover import download_fcf
+from spicy_snow.data_acquisition.snow_cover import download_snow_cover
 
 # import functions for pre-processing
 from spicy_snow.processing.s1_preprocessing import merge_partial_s1_images, s1_orbit_averaging,\

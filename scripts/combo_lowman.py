@@ -16,7 +16,7 @@ sys.path.append(expanduser('../../'))
 from spicy_snow.retrieval import retrieval_from_parameters, retrieve_snow_depth
 from spicy_snow.processing.s1_preprocessing import merge_partial_s1_images
 from spicy_snow.IO.user_dates import get_input_dates
-from spicy_snow.download.sentinel1 import s1_img_search
+from spicy_snow.data_acquisition.find_sentinel1 import s1_img_search
 
 quad_dir = Path('~/scratch/spicy-lowman-quadrant').expanduser()
 quad_dir.exists()

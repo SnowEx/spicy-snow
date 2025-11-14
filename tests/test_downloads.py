@@ -13,7 +13,7 @@ from shapely.geometry import box
 import sys
 from os.path import expanduser
 sys.path.append(expanduser('.'))
-from spicy_snow.download.sentinel1 import s1_img_search, combine_s1_images
+from spicy_snow.data_acquisition.find_sentinel1 import s1_img_search, combine_s1_images
 from spicy_snow.utils.raster import to01
 
 class TestSentinel1Search(unittest.TestCase):
