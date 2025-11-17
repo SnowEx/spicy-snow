@@ -21,7 +21,7 @@ from download import download_proba_v
 import logging
 log = logging.getLogger(__name__)
 
-def generate_sentinel1_dataarray(s1_fps, aoi, pol, ref = None):
+def generate_sentinel1_dataarray(s1_fps, aoi, pol, ref = None, resolution = 100):
     """
     Create an xarray.Dataset for a single polarization ('VV' or 'VH') from a list of files.
 
@@ -56,7 +56,7 @@ def generate_sentinel1_dataarray(s1_fps, aoi, pol, ref = None):
 
             # for first s1 setup dataarray by subsetting to aoi
             if len(da_list) == 0 and ref is None: 
-                da = tif_to_dataarray(fp, mask = mask, time = time, area = aoi)
+                da = tif_to_dataarray(fp, mask = mask, time = time, area = aoi, spatial_resolution = resolution)
                 ref = da.isel(time = 0)
             
             # afterwards reproject others to this coordinate grid
@@ -128,12 +128,6 @@ def generate_snowcover_dataarray(snowcover_fps, ref = None):
     # https://nsidc.org/sites/default/files/documents/user-guide/multi_vnp10a1f-v002-userguide.pdf
     src_crs = "+proj=sinu +lon_0=0 +x_0=0 +y_0=0 +ellps=WGS84 +datum=WGS84 +units=m +no_defs"
     snowcover_da = snowcover_da.rio.write_crs(src_crs)
-
-    if snowcover_da.max() > 1:
-        log.debug("snowcover_da max > 1 so normalizing from 0 to 100 -> 0 to 1")
-        snowcover_da = da_to01(snowcover_da, old_min = 0, old_max = 100)
-        log.debug(f"New snowcover_da max is {snowcover_da.max()} and min is {snowcover_da.min()}")
-
 
     if ref is not None:
         snowcover_da = snowcover_da.rio.reproject_match(ref)

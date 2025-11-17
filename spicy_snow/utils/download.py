@@ -5,6 +5,7 @@ from pathlib import Path
 import time
 import gzip
 from tqdm import tqdm
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import asf_search as asf
 from asf_search import download_url
@@ -59,6 +60,39 @@ def download_urls(urls, out_directory, reprocess=False, retries = 3):
         download_fps.append(out_fp)
     
     return download_fps
+
+
+def download_urls_parallel(urls, out_directory, reprocess=False, retries=3, max_workers=5):
+    urls = validate_urls(urls)
+    
+    out_directory = Path(out_directory)
+    out_directory.mkdir(parents=True, exist_ok=True)
+    
+    session = asf.ASFSession()
+    download_fps = []
+
+    def download_one(url):
+        out_fp = out_directory.joinpath(Path(url).name)
+        if out_fp.exists() and out_fp.stat().st_size != 0 and not reprocess:
+            return out_fp
+        
+        for attempt in range(retries):
+            try:
+                download_url(url, out_directory, session=session)
+                break
+            except Exception as e:
+                if attempt == retries - 1:
+                    raise e
+                time.sleep(2)
+        return out_fp
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {executor.submit(download_one, url): url for url in urls}
+        for future in tqdm(as_completed(futures), total=len(futures), desc="Downloading URLs"):
+            download_fps.append(future.result())
+    
+    return download_fps
+
 
 def decompress(infile, tofile):
     """

@@ -52,13 +52,13 @@ def find_snowcover_urls(aoi, start_date = None, stop_date = None, date_list = No
 
     return snowcover_urls
 
-def get_sentinel1_urls(start_date, end_date, aoi, source = 'opera'):
+def get_sentinel1_urls(start_date, stop_date, aoi, source = 'opera'):
     """
     Query ASF (Alaska Satellite Facility) for Sentinel-1 SAR products over a given AOI and date range.
 
     Args:
         start_date (str or datetime-like): Start of the date range for the search.
-        end_date (str or datetime-like): End of the date range for the search.
+        stop_date (str or datetime-like): End of the date range for the search.
         aoi (list, np.ndarray, or shapely.geometry.Box): Area of interest. Can be a 4-element bounding box 
             [xmin, ymin, xmax, ymax], a numpy array of coordinates, or a shapely Box.
         source (str, optional): Which ASF source to use. Options are:
@@ -75,7 +75,7 @@ def get_sentinel1_urls(start_date, end_date, aoi, source = 'opera'):
         AssertionError / IndexError: If AOI or dates are invalid (delegated to validate_aoi / validate_dates).
     """
     aoi = validate_aoi(aoi)
-    start_date, end_date = validate_dates(start_date, end_date)
+    start_date, stop_date = validate_dates(start_date, stop_date)
 
     platform = asf.PLATFORM.SENTINEL1
     if source == 'opera':
@@ -87,7 +87,7 @@ def get_sentinel1_urls(start_date, end_date, aoi, source = 'opera'):
 
     results = asf.geo_search(intersectsWith = aoi.wkt, 
                    start = start_date, 
-                   end = end_date, 
+                   end = stop_date, 
                    processingLevel = product_type, 
                    platform = platform)
     

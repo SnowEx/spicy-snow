@@ -28,7 +28,7 @@ def da_to01(da: xr.DataArray, old_min=0, old_max=100) -> xr.DataArray:
 
     return (da - old_min) / (old_max - old_min)
 
-def tif_to_dataarray(fp, mask = None, time = None, area = None, ref_da = None):
+def tif_to_dataarray(fp, mask = None, time = None, area = None, ref_da = None, spatial_resolution=None):
     """
     Open a single band, reproject to EPSG:4326, clip and pad to AOI, assign time stamp.
 
@@ -42,6 +42,16 @@ def tif_to_dataarray(fp, mask = None, time = None, area = None, ref_da = None):
         img = img.where(~mask.isnull())
 
     if ref_da is not None:
+        if spatial_resolution is not None:
+            if isinstance(spatial_resolution, (int, float)):
+                spatial_resolution = (spatial_resolution, spatial_resolution)
+            img = img.rio.reproject(
+                dst_crs='EPSG:4326',
+                resolution=spatial_resolution
+            )
+        else:
+            img = img.rio.reproject('EPSG:4326')
+
         img = img.rio.reproject_match(ref_da)
     else:
         img = img.rio.reproject('EPSG:4326')
