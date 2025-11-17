@@ -21,7 +21,7 @@ from download import download_proba_v
 import logging
 log = logging.getLogger(__name__)
 
-def generate_sentinel1_dataarray(s1_fps, aoi, pol, ref = None, resolution = 100):
+def generate_sentinel1_dataarray(s1_fps, aoi, pol, ref = None, resolution = 100, chunks= 'auto'):
     """
     Create an xarray.Dataset for a single polarization ('VV' or 'VH') from a list of files.
 
@@ -48,22 +48,21 @@ def generate_sentinel1_dataarray(s1_fps, aoi, pol, ref = None, resolution = 100)
 
             mask_fp = fp.parent.joinpath(f'{fp.stem[:-3]}_mask.tif')
             if mask_fp.exists():
-                mask = xr.open_dataarray(mask_fp)[0]
+                mask = xr.open_dataarray(mask_fp, chunks=chunks)[0]
                 # section 4.3 https://d2pn8kiwq2w21t.cloudfront.net/documents/ProductSpec_RTC-S1.pdf
                 # 0 = not affected by layover or shadow
                 mask = mask.where(mask == 0)
 
 
             # for first s1 setup dataarray by subsetting to aoi
-            if len(da_list) == 0 and ref is None: 
+            if ref is None: 
                 da = tif_to_dataarray(fp, mask = mask, time = time, area = aoi, spatial_resolution = resolution)
                 ref = da.isel(time = 0)
             
-            # afterwards reproject others to this coordinate grid
+            # if reference file given reproject others to this coordinate grid
             else:
                 da = tif_to_dataarray(fp, mask = mask, time = time, ref_da = ref)
-            
-
+                        
             # add relative orbit information
             da = da.assign_coords(track = ('time', [track]))
 

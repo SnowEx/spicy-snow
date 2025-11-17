@@ -28,7 +28,7 @@ def da_to01(da: xr.DataArray, old_min=0, old_max=100) -> xr.DataArray:
 
     return (da - old_min) / (old_max - old_min)
 
-def tif_to_dataarray(fp, mask = None, time = None, area = None, ref_da = None, spatial_resolution=None):
+def tif_to_dataarray(fp, mask = None, time = None, area = None, ref_da = None, spatial_resolution=None, chunks = 'auto'):
     """
     Open a single band, reproject to EPSG:4326, clip and pad to AOI, assign time stamp.
 
@@ -36,7 +36,7 @@ def tif_to_dataarray(fp, mask = None, time = None, area = None, ref_da = None, s
     If mask given we set all nan pixels in mask to nans.
     """
     import rioxarray as rxa    
-    img = xr.open_dataarray(fp, masked=True)[0]
+    img = xr.open_dataarray(fp, masked=True, chunks= chunks)[0]
     
     if mask is not None:
         img = img.where(~mask.isnull())
