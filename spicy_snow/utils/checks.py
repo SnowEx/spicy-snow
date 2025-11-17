@@ -159,3 +159,21 @@ def validate_aoi(aoi):
         )
     
     raise ValueError(f"Unable to parse: {aoi} to AOI bounding box.")
+
+def within_conus(aoi):
+    """
+    Quick bounding-box check using approximate contiguous US lat/lon limits.
+    Assumes aoi is 4 element iterable of (xmin, ymin, xmax, ymax) in EPSG:4326.
+    """
+    aoi = validate_aoi(aoi)
+    xmin, ymin, xmax, ymax = aoi.bounds
+
+    # Approximate CONUS bounding envelope
+    CONUS_XMIN, CONUS_XMAX = -125, -66
+    CONUS_YMIN, CONUS_YMAX = 24, 50
+
+    # Check intersection / overlap
+    intersects_lon = not (xmax < CONUS_XMIN or xmin > CONUS_XMAX)
+    intersects_lat = not (ymax < CONUS_YMIN or ymin > CONUS_YMAX)
+
+    return intersects_lon and intersects_lat

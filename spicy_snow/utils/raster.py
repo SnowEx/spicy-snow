@@ -12,43 +12,49 @@ import rioxarray as rxa
 import logging
 log = logging.getLogger(__name__)
 
-def to01(array, max = 100, min = 0):
+def da_to01(da: xr.DataArray, old_min=0, old_max=100) -> xr.DataArray:
+    """
+    Normalize an xarray DataArray from [old_min, old_max] to [0, 1].
+    Values outside the old range are replaced with NaN.
+    """
+    da = da.astype(float)  # ensure float for NaNs
 
-    log.debug("Making {array} to 0-1 range.")
-    array[array > max] = np.nan
-    array[array < min] = np.nan
+    # Mask values outside the old range
+    da = da.where((da >= old_min) & (da <= old_max))
 
-    # ignore the Runtime Warning
-    with np.errstate(divide='ignore'):
-        b = 1. /(max - min)
+    # Normalize
+    if old_max == old_min:
+        raise ValueError("old_max and old_min cannot be equal")
 
-    if not(np.isfinite(b)):
-        b = 0
-        
-    return np.vectorize(lambda x: b * (x - min))(array)
+    return (da - old_min) / (old_max - old_min)
 
-def tif_to_dataarray(fp, time = None, area = None, ref_da = None):
+def tif_to_dataarray(fp, mask = None, time = None, area = None, ref_da = None):
     """
     Open a single band, reproject to EPSG:4326, clip and pad to AOI, assign time stamp.
 
     If ref_da given it will try to reproject match those coordinates
+    If mask given we set all nan pixels in mask to nans.
     """
-    import rioxarray as rxa
-    name = fp.stem
-    
+    import rioxarray as rxa    
     img = xr.open_dataarray(fp, masked=True)[0]
     
-    if ref_da is None:
+    if mask is not None:
+        img = img.where(~mask.isnull())
+
+    if ref_da is not None:
+        img = img.rio.reproject_match(ref_da)
+    else:
         img = img.rio.reproject('EPSG:4326')
         if area is not None:
+            # clip and pad ensures we either clip or pad to match AOI
             img = img.rio.clip_box(*area.bounds)
             img = img.rio.pad_box(*area.bounds)
-    else:
-        img = img.rio.reproject_match(ref_da)
 
     if time is not None:
         dt = pd.to_datetime(time)
-    return img.expand_dims(time = [dt])
+        img = img.expand_dims(time = [dt])
+
+    return img
 
 def mosaic_group(sub):
     # sub is a DataArray with 'time' dimension

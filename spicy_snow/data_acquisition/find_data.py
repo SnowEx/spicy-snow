@@ -2,20 +2,55 @@
 Functions to search and download Sentinel-1 RTC images for specific geometries and dates
 """
 from pathlib import Path
-from functools import reduce
-import warnings
+from itertools import chain
 
 import numpy as np
 import pandas as pd
+import xarray as xr
+import rioxarray as rxa
 import geopandas as gpd
 
+# opera s1
 import asf_search as asf
+from asf_search import download_url
+# viirs snow cover
+import earthaccess
 
 from shapely.geometry import box, Polygon
 
-from spicy_snow.utils.checks import validate_aoi, validate_dates
+from spicy_snow.utils.checks import validate_aoi, validate_dates, within_conus
+
 import logging
 log = logging.getLogger(__name__)
+
+def find_snowcover_urls(aoi, start_date = None, stop_date = None, date_list = None):
+    
+    aoi = validate_aoi(aoi)
+    
+    if start_date is not None and stop_date is not None:
+        start_date, stop_date = validate_dates(start_date, stop_date)
+        # https://nsidc.org/data/vj110a1f/versions/2
+        results = earthaccess.search_data(
+            short_name = "VJ110A1F",
+            downloadable = True,
+            bounding_box = aoi.bounds,
+            temporal = (start_date, stop_date),
+        )
+    elif date_list is not None:
+        results = []
+        for date in np.unique(date_list):
+            results.extend(earthaccess.search_data(
+                    short_name = "VJ110A1F",
+                    downloadable = True,
+                    bounding_box = aoi.bounds,
+                    temporal = (date, date)))
+    else:
+        raise ValueError(f'One of start_date+stop_date or date_list must be given.')
+
+    # flatten to 1d list
+    snowcover_urls = list(chain.from_iterable([r.data_links() for r in results]))
+
+    return snowcover_urls
 
 def get_sentinel1_urls(start_date, end_date, aoi, source = 'opera'):
     """
@@ -137,4 +172,13 @@ def subset_asf_search_results(
     if scene_name is not None:
         df = df[df['properties.sceneName'] == scene_name]
 
-    return df    
+    return df
+
+# forest cover functions
+def download_proba_v(out_fp):
+    # this is the url from Lievens et al. 2021 paper
+    fcf_url = 'https://zenodo.org/record/3939050/files/PROBAV_LC100_global_v3.0.1_2019-nrt_Tree-CoverFraction-layer_EPSG-4326.tif'
+    # download just forest cover fraction to out file
+    out_fp = download_url(url = fcf_url, filename = out_fp)
+
+    return out_fp

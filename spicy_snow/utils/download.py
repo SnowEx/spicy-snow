@@ -72,4 +72,11 @@ def decompress(infile, tofile):
         ouf.write(decom_str)
 
         return tofile
-    
+
+def download_proba_v(out_fp):
+    # this is the url from Lievens et al. 2021 paper
+    fcf_url = 'https://zenodo.org/record/3939050/files/PROBAV_LC100_global_v3.0.1_2019-nrt_Tree-CoverFraction-layer_EPSG-4326.tif'
+    # download just forest cover fraction to out file
+    fcf_fp = download_url(url = fcf_url, filename = out_fp)
+
+    return fcf_fp

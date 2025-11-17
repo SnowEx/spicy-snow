@@ -278,7 +278,7 @@ def s1_incidence_angle_masking(dataset: xr.Dataset, inplace: bool = False) -> xr
 
 def merge_s1_subsets(dataset_dictionary: Dict[str, xr.Dataset]) -> xr.Dataset:
     """
-    Remove s1 image outliers by masking pixels with incidence angles > 70 degrees
+    Merge dictionarys containing Datasets within into one dataset
 
     Args:
     {'1A-asc': dataset, ...}: dictionary of up to 4 s1 datasets for permutations of 
