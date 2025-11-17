@@ -17,8 +17,7 @@ from spicy_snow.utils.checks import validate_aoi, validate_dates
 import logging
 log = logging.getLogger(__name__)
 
-
-def get_asf_search_results(start_date, end_date, aoi, source = 'opera'):
+def get_sentinel1_urls(start_date, end_date, aoi, source = 'opera'):
     """
     Query ASF (Alaska Satellite Facility) for Sentinel-1 SAR products over a given AOI and date range.
 
@@ -59,7 +58,26 @@ def get_asf_search_results(start_date, end_date, aoi, source = 'opera'):
     
     results_df = pd.json_normalize(results.geojson(), record_path = ['features'])
 
-    return results_df
+    sentinel1_urls = get_urls_from_asf_search(results_df)
+
+    return sentinel1_urls
+
+def get_urls_from_asf_search(asf_results_df):
+    """
+    Convert dataframe of ASF search results to urls.
+    """
+    urls = []
+
+    for _, row in asf_results_df.iterrows():
+        main = row.get('properties.url')
+        if main:
+            urls.append(main)
+
+        extras = row.get('properties.additionalUrls', [])
+        if extras:
+            urls.extend(extras)
+
+    return urls
 
 def subset_asf_search_results(
     results_df, 
@@ -120,20 +138,3 @@ def subset_asf_search_results(
         df = df[df['properties.sceneName'] == scene_name]
 
     return df    
-
-def get_urls_from_asf_search(asf_results_df):
-    """
-    Convert dataframe of ASF search results to urls.
-    """
-    urls = []
-
-    for _, row in asf_results_df.iterrows():
-        main = row.get('properties.url')
-        if main:
-            urls.append(main)
-
-        extras = row.get('properties.additionalUrls', [])
-        if extras:
-            urls.extend(extras)
-
-    return urls
