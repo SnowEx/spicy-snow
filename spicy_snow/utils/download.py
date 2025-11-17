@@ -1,49 +1,61 @@
 """
 Utility functions for downloading files
 """
-import sys
+from pathlib import Path
 import time
-from os.path import basename, exists
 import gzip
-from urllib.request import urlretrieve
+
+import asf_search as asf
+from asf_search import download_url
+
+from checks import validate_urls
 
 import logging
 log = logging.getLogger(__name__)
 
-def reporthook(count, block_size, total_size):
+def download_urls(urls, out_directory, reprocess=False, retries = 3):
     """
-    Hook for urlib downloads to get progress readout.
-    """
-    global start_time
-    if count == 0:
-        start_time = time.time()
-        return
-    duration = time.time() - start_time
-    progress_size = int(count * block_size)
-    speed = min(int(count*block_size*100/total_size),100)
-    percent = int(count * block_size * 100 / total_size)
-    sys.stdout.write("\r...%d%%, %d MB, %d KB/s, %d seconds passed" %
-                    (percent, progress_size / (1024 * 1024), speed, duration))
-    sys.stdout.flush()
+    Download a list of images from given URLs into the specified output directory.
 
-def url_download(url, out_fp, overwrite = False, verbose = True):
+    Args:
+        urls (list): List of URLs (or nested iterables) pointing to images or files.
+        out_directory (str or Path): Directory where files will be saved.
+        reprocess (bool, optional): If True, re-download files even if they already exist. Defaults to False.
+
+    Returns:
+        list of Path: List of file paths to the downloaded files.
     """
-    Downloads url with a progress bar and overwrite check.
-    """
-    # check if file already exists
-    if not exists(out_fp) or overwrite == True:
-        # progress bar for your download?
-        if verbose:
-            log.info(f'Downloading {basename(out_fp)}.')
-            urlretrieve(url, out_fp, reporthook)
-            log.info('')
-        # or not?
-        else:
-            urlretrieve(url, out_fp)
-    # if already exists. skip download.
-    else:
-        if verbose:
-            log.info(f'{basename(out_fp)} already exists. Skipping.')
+    urls = validate_urls(urls)
+    
+    # Ensure output directory is a Path object
+    out_directory = Path(out_directory)
+    out_directory.mkdir(parents=True, exist_ok=True)
+
+    # ASF session for authenticated downloads
+    session = asf.ASFSession()
+
+    download_fps = []
+    for url in urls:
+        out_fp = out_directory.joinpath(Path(url).name)
+        
+        if out_fp.exists() and out_fp.stat().st_size != 0 and not reprocess:
+            download_fps.append(out_fp)
+            continue
+
+        for attempt in range(retries):
+            try:
+                download_url(url, out_directory, session=session)
+                break  # success, exit retry loop
+            except Exception as e:
+                if attempt == retries-1:  # last attempt
+                    raise e
+                # optionally print warning
+                print(f"Retry {attempt+1} failed for {url}: {e}")
+                time.sleep(2)  # wait before retrying
+
+        download_fps.append(out_fp)
+    
+    return download_fps
 
 def decompress(infile, tofile):
     """
@@ -57,3 +69,4 @@ def decompress(infile, tofile):
         ouf.write(decom_str)
 
         return tofile
+    

@@ -3,7 +3,6 @@ Functions to search and download Sentinel-1 RTC images for specific geometries a
 """
 from pathlib import Path
 from functools import reduce
-from datetime import date
 import warnings
 
 import numpy as np
@@ -14,6 +13,7 @@ import asf_search as asf
 
 from shapely.geometry import box, Polygon
 
+from spicy_snow.utils.checks import validate_aoi, validate_dates
 import logging
 log = logging.getLogger(__name__)
 
@@ -72,7 +72,7 @@ def subset_asf_search_results(
     scene_name=None
 ):
     """
-    Subset ASF search results with optional filters and AOI intersection.
+    Optional subset ASF search results with filters and AOI intersection.
 
     Args:
         results_df (pd.DataFrame): ASF search results.
@@ -121,11 +121,13 @@ def subset_asf_search_results(
 
     return df    
 
-def get_urls_from_asf_search(results_df):
-
+def get_urls_from_asf_search(asf_results_df):
+    """
+    Convert dataframe of ASF search results to urls.
+    """
     urls = []
 
-    for _, row in results_df.iterrows():
+    for _, row in asf_results_df.iterrows():
         main = row.get('properties.url')
         if main:
             urls.append(main)
@@ -135,102 +137,3 @@ def get_urls_from_asf_search(results_df):
             urls.extend(extras)
 
     return urls
-
-def validate_dates(start_date, end_date):
-    """
-    Validate a start and end date for Sentinel-1 SAR availability.
-
-    Rules:
-    - Convert both dates to pandas Timestamps.
-    - Dates must be >= 2014 (Sentinel-1A launch).
-    - Dates must be <= today.
-    - start_date must be < end_date.
-    - Warn if dates overlap Sentinel-1B outage (Dec 2021 → present).
-    - Warn if dates fall before Sentinel-1C becomes operational (May 20, 2025).
-    """
-    # ---- Convert to Timestamps ----
-    if start_date is not None:
-        start = pd.to_datetime(start_date)
-    else:
-        raise ValueError("start_date cannot be None")
-
-    if end_date is not None:
-        end = pd.to_datetime(end_date)
-    else:
-        raise ValueError("end_date cannot be None")
-
-    # ---- Basic range checks ----
-    if start.year < 2014 or end.year < 2014:
-        raise ValueError("Dates must be in or after 2014 (Sentinel-1A launch).")
-
-    today = pd.to_datetime(date.today())
-
-    if start > today or end > today:
-        raise ValueError("Dates cannot be in the future.")
-
-    if start >= end:
-        raise ValueError("start_date must be earlier than end_date.")
-
-    # ---- Special Sentinel mission warnings ----
-    # S1B failed: Dec 23, 2021 →
-    # S1C operational: May 20, 2025
-
-    s1b_fail = pd.to_datetime("2021-12-23")
-    s1c_start = pd.to_datetime("2025-05-20")
-    if end >= s1b_fail and end < s1c_start:
-        warnings.warn(
-            "Date range intersects the Sentinel-1B outage period (Dec 2021 → present). "
-            "Only S1A data will be available."
-        )
-
-    return start, end
-
-
-def validate_aoi(aoi):
-    """
-    Validate and normalize an AOI to a shapely Box geometry.
-
-    Accepts:
-    - Iterable of four floats [xmin, ymin, xmax, ymax]
-    - Dicts using common key conventions:
-        {'xmin','ymin','xmax','ymax'} or
-        {'west','south','east','north'} or
-        {'minx','miny','maxx','maxy'}
-    - Existing shapely geometry (Box, Polygon, etc.)
-
-    Returns:
-        shapely.geometry.Polygon (a box)
-    """
-    if isinstance(aoi, Polygon): return aoi
-
-    if isinstance(aoi, list) or isinstance(aoi, np.ndarray):
-        if len(aoi) == 4:
-
-            # AOI given as [xmin, ymin, xmax, ymax] (or any four floats)
-            xmin, ymin, xmax, ymax = aoi  # your 4-element iterable
-
-            return box(xmin, ymin, xmax, ymax)
-        
-    if isinstance(aoi, dict):
-        key_sets = [
-            ("xmin", "ymin", "xmax", "ymax"),
-            ("west", "south", "east", "north"),
-            ("minx", "miny", "maxx", "maxy"),
-        ]
-
-        for keys in key_sets:
-            if all(k in aoi for k in keys):
-                xmin, ymin, xmax, ymax = (float(aoi[k]) for k in keys)
-
-                # auto-fix reversed ranges
-                if xmin > xmax:
-                    xmin, xmax = xmax, xmin
-                if ymin > ymax:
-                    ymin, ymax = ymax, ymin
-
-                return box(xmin, ymin, xmax, ymax)
-
-    raise ValueError(
-        f"AOI dict must contain one of these key sets: {key_sets} "
-        f"but received keys: {list(aoi.keys())}"
-    )
