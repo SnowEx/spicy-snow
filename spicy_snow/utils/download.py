@@ -4,11 +4,14 @@ Utility functions for downloading files
 from pathlib import Path
 import time
 import gzip
+from tqdm import tqdm
 
 import asf_search as asf
 from asf_search import download_url
 
-from checks import validate_urls
+import sys
+sys.path.append('/Users/zmhoppinen/Documents/spicy-snow')
+from spicy_snow.utils.checks import validate_urls
 
 import logging
 log = logging.getLogger(__name__)
@@ -35,7 +38,7 @@ def download_urls(urls, out_directory, reprocess=False, retries = 3):
     session = asf.ASFSession()
 
     download_fps = []
-    for url in urls:
+    for url in tqdm(urls, desc = 'Downloading Urls'):
         out_fp = out_directory.joinpath(Path(url).name)
         
         if out_fp.exists() and out_fp.stat().st_size != 0 and not reprocess:

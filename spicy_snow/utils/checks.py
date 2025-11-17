@@ -23,6 +23,9 @@ def validate_urls(urls, check_exists=False, timeout=5):
         ValueError: If any URL is invalid or if no URLs remain after validation.
     """
 
+    # check if any urls in list
+    assert len(urls) > 0, "No urls found"
+    
     def flatten(lst):
         """Recursively flatten nested iterables, skip strings as iterables."""
         for item in lst:
