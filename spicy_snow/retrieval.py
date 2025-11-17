@@ -17,7 +17,7 @@ sys.path.append(expanduser('../'))
 
 # import functions for downloading
 from spicy_snow.find_data import get_sentinel1_urls, find_snowcover_urls
-from spicy_snow.processing.generate_dataarrays import generate_sentinel1_dataarray, \
+from spicy_snow.processing.generate_dataarrays import generate_sentinel1_dataarray, generate_sentinel1_zarr,\
     generate_snowcover_dataarray, generate_forest_fraction_dataarray, convert_snowcover_dates_to_s1_overpasses
 
 # import functions for pre-processing
@@ -39,6 +39,7 @@ from spicy_snow.utils.download import download_urls, download_urls_parallel
 def retrieve_snow_depth(aoi: shapely.geometry.Polygon, 
                         dates: Tuple[str, str], 
                         work_dir: str = './',
+                        work_stem = None,
                         debug: bool = False,
                         ims_masking: bool = True,
                         wet_snow_thresh: float = -2,
@@ -54,8 +55,7 @@ def retrieve_snow_depth(aoi: shapely.geometry.Polygon,
     aoi: Shapely bounding box or [xmin, ymin, xmax, ymax] iterable of desired area to search within
     dates: Start and end date to search between
     work_dir: filepath to directory to work in. Will be created if not existing
-    job_name: name for hyp3 job
-    existing_job_name: name for preexisiting hyp3 job to download and avoid resubmitting
+    job_name: [Optional] Name for project file stems otherwise generated from dates
     debug: do you want to get verbose logging?
     ims_masking: do you want to mask pixels by IMS snow free imagery?
     wet_snow_thresh: what threshold in dB change to use for melting and re-freezing snow? Default: -2
@@ -92,6 +92,9 @@ def retrieve_snow_depth(aoi: shapely.geometry.Polygon,
 
     setup_logging(log_dir = join(work_dir, 'logs'), debug = debug)
     log = logging.getLogger(__name__)
+
+    # get main stem
+    work_stem = f'{pd.to_datetime(dates[0]).date()}_{pd.to_datetime(dates[1]).date()}' if work_dir is not None else work_stem
     
     ## Downloading Steps
 
@@ -100,24 +103,33 @@ def retrieve_snow_depth(aoi: shapely.geometry.Polygon,
     # Keep only necessary downloads vv, vh, mask.
     s1_urls = [u for u in s1_urls if u.endswith(('_VV.tif', '_VH.tif', '_mask.tif'))]
 
+    parralel_memmap = True if len(s1_urls) > 500 else False
+
     # if greater than 500 opera images use parralel downloads
-    if len(s1_urls) > 500:
+    if parralel_memmap:
         s1_fps = download_urls_parallel(s1_urls, work_dir.joinpath('opera'))
     else:
         s1_fps = download_urls(s1_urls, work_dir.joinpath('opera'))
     
-    # generate dataset and start to save s1 data vars
+    # generate dataset and start to save s1 data vars. Use zarr to reduce memory load for big arrays
     ds = xr.Dataset()
-    ds['vv'] = generate_sentinel1_dataarray(s1_fps, aoi, pol = 'VV')
+    if parralel_memmap:
+        ds['vv'] = generate_sentinel1_zarr(s1_fps, aoi, pol = 'VV', zarr_path = work_dir.joinpath(f'{work_stem}.vv.zarr'))
+    else:
+        ds['vv'] = generate_sentinel1_dataarray(s1_fps, aoi, pol = 'VV')
 
     # grab spatial reference from first time step of VV
     spatial_reference = ds['vv'].isel(time =0)
 
-    ds['vh'] = generate_sentinel1_dataarray(s1_fps, aoi, pol = 'VH', ref = spatial_reference)
+    # repeat combining and spatial resampling for VH
+    if parralel_memmap:
+        ds['vh'] = generate_sentinel1_zarr(s1_fps, aoi, pol = 'VH', ref = spatial_reference, zarr_path = work_dir.joinpath(f'{work_stem}.vh.zarr'))
+    else:
+        ds['vh'] = generate_sentinel1_dataarray(s1_fps, aoi, pol = 'VH', ref = spatial_reference)
     
     # download viirs snow cover fraction for each sentinel 1 overpass date
     snowcover_urls = find_snowcover_urls(date_list = ds.time.dt.date, aoi = aoi)
-    if len(snowcover_urls) > 500:
+    if parralel_memmap:
         snowcover_fps = download_urls_parallel(snowcover_urls, work_dir.joinpath('snowcover'))
     else:
         snowcover_fps = download_urls(snowcover_urls, work_dir.joinpath('snowcover'))

@@ -42,19 +42,18 @@ def tif_to_dataarray(fp, mask = None, time = None, area = None, ref_da = None, s
         img = img.where(~mask.isnull())
 
     if ref_da is not None:
+        img = img.rio.reproject_match(ref_da)
+
+    else:
         if spatial_resolution is not None:
             if isinstance(spatial_resolution, (int, float)):
                 spatial_resolution = (spatial_resolution, spatial_resolution)
             img = img.rio.reproject(
                 dst_crs='EPSG:4326',
-                resolution=spatial_resolution
-            )
+                resolution=spatial_resolution)
         else:
             img = img.rio.reproject('EPSG:4326')
 
-        img = img.rio.reproject_match(ref_da)
-    else:
-        img = img.rio.reproject('EPSG:4326')
         if area is not None:
             # clip and pad ensures we either clip or pad to match AOI
             img = img.rio.clip_box(*area.bounds)

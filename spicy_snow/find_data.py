@@ -19,7 +19,7 @@ import earthaccess
 from shapely.geometry import box, Polygon
 
 from spicy_snow.utils.checks import validate_aoi, validate_dates, within_conus
-
+from spicy_snow.utils.spicy_logging import temp_silence_logger
 import logging
 log = logging.getLogger(__name__)
 
@@ -36,14 +36,16 @@ def find_snowcover_urls(aoi, start_date = None, stop_date = None, date_list = No
             bounding_box = aoi.bounds,
             temporal = (start_date, stop_date),
         )
+        
     elif date_list is not None:
         results = []
         for date in np.unique(date_list):
-            results.extend(earthaccess.search_data(
-                    short_name = "VJ110A1F",
-                    downloadable = True,
-                    bounding_box = aoi.bounds,
-                    temporal = (date, date)))
+            with temp_silence_logger("earthaccess", level=logging.ERROR):
+                results.extend(earthaccess.search_data(
+                        short_name = "VJ110A1F",
+                        downloadable = True,
+                        bounding_box = aoi.bounds,
+                        temporal = (date, date)))
     else:
         raise ValueError(f'One of start_date+stop_date or date_list must be given.')
 
