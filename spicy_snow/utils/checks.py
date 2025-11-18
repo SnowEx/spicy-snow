@@ -5,7 +5,7 @@ from datetime import date
 
 import numpy as np
 import pandas as pd
-from shapely.geometry import box, Polygon
+from shapely.geometry import box, Polygon, Point
 
 def validate_urls(urls, check_exists=False, timeout=5):
     """
@@ -111,54 +111,55 @@ def validate_dates(start_date, end_date):
 
 def validate_aoi(aoi):
     """
-    Validate and normalize an AOI to a shapely Box geometry.
+    Validate and normalize an AOI to a shapely Box geometry or a Point.
 
     Accepts:
-    - Iterable of four floats [xmin, ymin, xmax, ymax]
+    - Iterable of four floats [xmin, ymin, xmax, ymax] -> returns Box (Polygon)
+    - Iterable of two floats [x, y] -> returns Point
     - Dicts using common key conventions:
         {'xmin','ymin','xmax','ymax'} or
         {'west','south','east','north'} or
-        {'minx','miny','maxx','maxy'}
-    - Existing shapely geometry (Box, Polygon, etc.)
+        {'minx','miny','maxx','maxy'} -> returns Box (Polygon)
+    - Existing shapely geometry (Box, Polygon, Point, etc.)
 
     Returns:
-        shapely.geometry.Polygon (a box)
+        shapely.geometry.Polygon or shapely.geometry.Point
     """
-    if isinstance(aoi, Polygon): return aoi
+    # If already a shapely geometry, return as is
+    if isinstance(aoi, (Polygon, Point)):
+        return aoi
 
-    if isinstance(aoi, list) or isinstance(aoi, np.ndarray) or isinstance(aoi, tuple):
+    # If iterable (list, tuple, np.ndarray)
+    if isinstance(aoi, (list, tuple, np.ndarray)):
         if len(aoi) == 4:
-
-            # AOI given as [xmin, ymin, xmax, ymax] (or any four floats)
-            xmin, ymin, xmax, ymax = aoi  # your 4-element iterable
-
+            xmin, ymin, xmax, ymax = aoi
+            # auto-fix reversed ranges
+            if xmin > xmax: xmin, xmax = xmax, xmin
+            if ymin > ymax: ymin, ymax = ymax, ymin
             return box(xmin, ymin, xmax, ymax)
-        
+        elif len(aoi) == 2:
+            x, y = aoi
+            return Point(x, y)
+
+    # If dict, try known key sets
     if isinstance(aoi, dict):
         key_sets = [
             ("xmin", "ymin", "xmax", "ymax"),
             ("west", "south", "east", "north"),
             ("minx", "miny", "maxx", "maxy"),
         ]
-
         for keys in key_sets:
             if all(k in aoi for k in keys):
                 xmin, ymin, xmax, ymax = (float(aoi[k]) for k in keys)
-
-                # auto-fix reversed ranges
-                if xmin > xmax:
-                    xmin, xmax = xmax, xmin
-                if ymin > ymax:
-                    ymin, ymax = ymax, ymin
-
+                if xmin > xmax: xmin, xmax = xmax, xmin
+                if ymin > ymax: ymin, ymax = ymax, ymin
                 return box(xmin, ymin, xmax, ymax)
-
         raise ValueError(
             f"AOI dict must contain one of these key sets: {key_sets} "
             f"but received keys: {list(aoi.keys())}"
         )
-    
-    raise ValueError(f"Unable to parse: {aoi} to AOI bounding box.")
+
+    raise ValueError(f"Unable to parse {aoi} as AOI bounding box or Point.")
 
 def within_conus(aoi):
     """

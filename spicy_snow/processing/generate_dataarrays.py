@@ -165,7 +165,7 @@ def da_to_2d_array(da, y, x, crs, transform):
     da = da.rio.write_crs(crs).rio.write_transform(transform)
     return da
 
-def parralel_generate_sentinel1_dataarray(
+def generate_sentinel1_dataarray(
     s1_fps,
     aoi,
     pol,
@@ -340,8 +340,13 @@ def convert_snowcover_dates_to_s1_overpasses(viirs_snowcover, s1_da):
     return precise_snowcover
 
 def get_nlcd(aoi):
+    if isinstance(aoi, Point):
+        aoi = aoi.buffer(0.001)
     g = gpd.GeoSeries([box(*aoi.bounds)], crs='EPSG:4326')
     fcf_da = gh.nlcd_bygeom(geometry = g)[0]['canopy_2021']
+
+    if isinstance(aoi, Point):
+        fcf_da = da_to_2d_array(fcf_da, aoi.y, aoi.x, fcf_da.crs, fcf_da.rio.transform())
 
     return fcf_da
 
