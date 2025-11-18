@@ -25,7 +25,6 @@ def amplitude_to_dB(dataset: xr.Dataset):
 
     Args:
     dataset: Xarray Dataset of sentinel images in amplitude
-    inplace: boolean flag to modify original Dataset or return a new Dataset
 
     Returns:
     dataset: Xarray dataset of sentinel image in dB
@@ -50,7 +49,6 @@ def dB_to_amplitude(dataset: xr.Dataset):
 
     Args:
     dataset: Xarray Dataset of sentinel images in dB
-    inplace: boolean flag to modify original Dataset or return a new Dataset
 
     Returns:
     dataset: Xarray Dataset of sentinel images in amplitude
@@ -74,7 +72,6 @@ def s1_orbit_averaging(dataset: xr.Dataset) -> xr.Dataset:
 
     Args:
     dataset: Xarray Dataset of sentinel images to normalize by orbit 
-    inplace: boolean flag to modify original Dataset or return a new Dataset
 
     Returns:
     dataset: Xarray Dataset of sentinel images with all s1 images normalized to total mean
@@ -86,7 +83,7 @@ def s1_orbit_averaging(dataset: xr.Dataset) -> xr.Dataset:
         dataset = amplitude_to_dB(dataset)
 
     # get all unique relative orbits
-    orbits = np.unique(dataset['track'].data)
+    orbits = np.unique(dataset['track'].values)
 
     # loop through bands
     for pol in s1_dual_pols:
@@ -115,7 +112,6 @@ def s1_clip_outliers(dataset: xr.Dataset) -> xr.Dataset:
 
     Args:
     dataset: Xarray Dataset of sentinel images to clip outliers
-    inplace: boolean flag to modify original Dataset or return a new Dataset
 
     Returns:
     dataset: Xarray Dataset of sentinel images with masked outliers

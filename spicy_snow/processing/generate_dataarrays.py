@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import geopandas as gpd
 import xarray as xr
-import dask.array as da
+import dask
 
 from shapely.geometry import box, Polygon
 import h5py
@@ -24,82 +24,82 @@ from download import download_proba_v
 import logging
 log = logging.getLogger(__name__)
 
-def init_output_zarr(path, ref_da, times, chunks="auto", pol="vv"):
-    path = Path(path)
-    if path.exists():
-        import shutil
-        shutil.rmtree(path)
+def init_output(ref_da, times, tracks, pol="vv", zarr_path = None):
+    path = Path(zarr_path)
 
     y = ref_da["y"]
     x = ref_da["x"]
 
-    # Dask array placeholder
-    data = da.zeros(
-        (len(times), len(y), len(x)), 
-        chunks=(1, chunks, chunks),
+    data = np.zeros(
+        (len(times), len(y), len(x)),
         dtype=ref_da.dtype,
     )
 
-    ds = xr.Dataset(
-        {pol: (("time", "y", "x"), data)},
-        coords=dict(
-            time=("time", times),
-            y=y,
-            x=x,
-        )
+    da = xr.DataArray(
+        data,  # the actual array: shape (time, y, x)
+        dims=("time", "y", "x"),
+        coords={
+            "time": times,
+            "y": y,
+            "x": x,
+            "track": ("time", tracks),
+        },
+        name=pol,  # name of the variable
     )
 
-    ds.to_zarr(path, mode="w")
-    return ds
+    if zarr_path is not None:
+        da.to_zarr(path, mode="w")
 
-def generate_sentinel1_zarr(s1_fps, aoi, pol, zarr_path, ref = None, resolution=(100,100)):
+    return da
+
+def generate_sentinel1_zarr(s1_fps, aoi, pol, zarr_path = None, ref = None, resolution=(100, 100)):
     aoi = validate_aoi(aoi)
     pol = pol.lower()
 
     times = []
-    metadata = []
+    tracks = []
+
+    pol_fps = [f for f in s1_fps if f.stem.lower().endswith(pol)]
 
     # First pass — collect timestamps
-    for fp in s1_fps:
+    for fp in pol_fps:
         if fp.stem.lower().endswith(pol):
             t = pd.to_datetime(fp.stem.split('_')[4], format='%Y%m%dT%H%M%SZ')
             times.append(t)
 
             track = int(fp.stem.split('_')[3].split('-')[0][1:])
-            sat = fp.stem.split('_')[6]
-            metadata.append((track, sat))
-
-    # Sort by time
-    order = sorted(range(len(times)), key=lambda i: times[i])
-    times = [times[i] for i in order]
-    metadata = [metadata[i] for i in order]
-    fps_sorted = [s1_fps[i] for i in order]
+            tracks.append(track)
 
     # Build reference grid from first file
     if ref is None:
-        first_fp = fps_sorted[0]
-        ref = xr.open_dataarray(first_fp, chunks="auto")[0]
-        assert ref.rio.crs.is_projected, f'Unable to set spatial resolution with non-projected crs: {da.rio.crs}'
+        ref = xr.open_dataarray(pol_fps[0], chunks="auto")[0]
+        assert ref.rio.crs.is_projected, f'Unable to set spatial resolution with non-projected crs: {ref.rio.crs}'
 
         ref = ref.rio.reproject(dst_crs=ref.rio.crs, resolution=resolution)
         ref = ref.rio.reproject("EPSG:4326")
-        ref = ref.rio.clip_box(*aoi.bounds).rio.pad_box(*aoi.bounds)
+        ref = ref.rio.clip_box(*box(*aoi).bounds).rio.pad_box(*box(*aoi).bounds)
 
     # Create empty on-disk dataset
-    ds = init_output_zarr(zarr_path, ref, times, pol=pol)
+    zarr = init_output(
+        ref,
+        times,
+        tracks=tracks,
+        pol=pol,
+        zarr_path=zarr_path
+    )
 
     # Write slices one-by-one
-    for i, fp in enumerate(tqdm(fps_sorted, desc=f"Merging s1 tifs for {pol}")):
-        da = xr.open_dataarray(fp, chunks="auto")[0]
-        da = da.rio.reproject_match(ref)
-        da = da.expand_dims(time=[times[i]])
+    for fp, time in tqdm(zip(pol_fps, times, strict = True), desc=f"Merging s1 tifs for {pol}", total = len(times)):
+        img = xr.open_dataarray(fp, chunks="auto")[0]
+        img = img.rio.reproject_match(ref)
+        zarr.loc[dict(time = time)] = img
 
-        # Write directly to the Zarr slice
-        ds[pol][i:i+1, :, :].data = da.data
 
     # Re-open final dataset (lazy)
-    final = xr.open_zarr(zarr_path)
-    return final[pol]
+    if zarr_path is not None:
+        zarr = xr.open_zarr(zarr_path)
+
+    return zarr
 
 def generate_sentinel1_dataarray(s1_fps, aoi, pol, ref = None, resolution = 100, chunks= 'auto'):
     """

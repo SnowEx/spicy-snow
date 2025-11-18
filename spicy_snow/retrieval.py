@@ -104,6 +104,8 @@ def retrieve_snow_depth(aoi: shapely.geometry.Polygon,
     s1_urls = [u for u in s1_urls if u.endswith(('_VV.tif', '_VH.tif', '_mask.tif'))]
 
     parralel_memmap = True if len(s1_urls) > 500 else False
+    # TODO change for testing...
+    parralel_memmap = True
 
     # if greater than 500 opera images use parralel downloads
     if parralel_memmap:
@@ -128,7 +130,7 @@ def retrieve_snow_depth(aoi: shapely.geometry.Polygon,
         ds['vh'] = generate_sentinel1_dataarray(s1_fps, aoi, pol = 'VH', ref = spatial_reference)
     
     # download viirs snow cover fraction for each sentinel 1 overpass date
-    snowcover_urls = find_snowcover_urls(date_list = ds.time.dt.date, aoi = aoi)
+    snowcover_urls = find_snowcover_urls(start_date = dates[0], stop_date = dates[1], date_list = ds.time.dt.date, aoi = aoi)
     if parralel_memmap:
         snowcover_fps = download_urls_parallel(snowcover_urls, work_dir.joinpath('snowcover'))
     else:
@@ -144,11 +146,13 @@ def retrieve_snow_depth(aoi: shapely.geometry.Polygon,
     # table 1 https://nsidc.org/sites/default/files/documents/user-guide/multi_vnp10a1f-v002-userguide.pdf
     ds['watermask'] = (viirs_snowcover == 237).median('time')
     # set pixels with over 10% snow cover to snowcovered
-    ds['snowcover'] = viirs_snowcover.where(viirs_snowcover <= 100) > 10
+    ds['snowcover'] = (viirs_snowcover.where(viirs_snowcover <= 100) > 10).astype(int)
     
     # download fcf and add to dataset ['fcf'] keyword
     # this will us NLCD for within US (very fast) or Proba-v for global (very slow)
     ds['fcf'] = generate_forest_fraction_dataarray(aoi, ref = spatial_reference)
+
+    return ds
 
     ## Preprocessing Steps
     log.info("Preprocessing Sentinel-1 images")

@@ -15,6 +15,7 @@ import asf_search as asf
 from asf_search import download_url
 # viirs snow cover
 import earthaccess
+from tqdm import tqdm
 
 from shapely.geometry import box, Polygon
 
@@ -26,31 +27,24 @@ log = logging.getLogger(__name__)
 def find_snowcover_urls(aoi, start_date = None, stop_date = None, date_list = None):
     
     aoi = validate_aoi(aoi)
+    start_date, stop_date = validate_dates(start_date, stop_date)
     
-    if start_date is not None and stop_date is not None:
-        start_date, stop_date = validate_dates(start_date, stop_date)
-        # https://nsidc.org/data/vj110a1f/versions/2
-        results = earthaccess.search_data(
-            short_name = "VJ110A1F",
-            downloadable = True,
-            bounding_box = aoi.bounds,
-            temporal = (start_date, stop_date),
-        )
-        
-    elif date_list is not None:
-        results = []
-        for date in np.unique(date_list):
-            with temp_silence_logger("earthaccess", level=logging.ERROR):
-                results.extend(earthaccess.search_data(
-                        short_name = "VJ110A1F",
-                        downloadable = True,
-                        bounding_box = aoi.bounds,
-                        temporal = (date, date)))
-    else:
-        raise ValueError(f'One of start_date+stop_date or date_list must be given.')
-
-    # flatten to 1d list
+    # https://nsidc.org/data/vj110a1f/versions/2
+    results = earthaccess.search_data(
+        short_name = "VJ110A1F",
+        downloadable = True,
+        bounding_box = aoi.bounds,
+        temporal = (start_date, stop_date),
+    )
+    
+    # Flatten all URLs
     snowcover_urls = list(chain.from_iterable([r.data_links() for r in results]))
+    
+    if date_list is not None:
+        date_list = pd.to_datetime(date_list)
+        # extract dates from filenames
+        url_dates = pd.to_datetime([Path(url).stem.split('.')[1] for url in snowcover_urls], format="A%Y%j")
+        snowcover_urls = [url for url, dt in zip(snowcover_urls, url_dates) if dt in date_list]
 
     return snowcover_urls
 
