@@ -4,9 +4,10 @@ Utility functions for downloading files
 from pathlib import Path
 import time
 import gzip
-from tqdm import tqdm
+import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+from tqdm.auto import tqdm
 import asf_search as asf
 from asf_search import download_url
 
@@ -61,38 +62,65 @@ def download_urls(urls, out_directory, reprocess=False, retries = 3):
     
     return download_fps
 
+def download_urls_parallel(
+    urls,
+    out_directory,
+    reprocess=False,
+    retries=3,
+    max_workers=10,
+    timeout=20,
+):
+    """
+    Faster parallel downloader using a shared requests.Session,
+    keep-alive, connection pooling, larger thread pool,
+    and streaming writes.
+    """
 
-def download_urls_parallel(urls, out_directory, reprocess=False, retries=3, max_workers=5):
     urls = validate_urls(urls)
-    
     out_directory = Path(out_directory)
     out_directory.mkdir(parents=True, exist_ok=True)
-    
-    session = asf.ASFSession()
-    download_fps = []
+
+    # --- KEY SPEED-UP: pooled TCP connections
+    session = requests.Session()
+    adapter = requests.adapters.HTTPAdapter(pool_connections=max_workers,
+                                            pool_maxsize=max_workers,
+                                            max_retries=0)
+    session.mount("https://", adapter)
+    session.mount("http://", adapter)
 
     def download_one(url):
-        out_fp = out_directory.joinpath(Path(url).name)
+        out_fp = out_directory / Path(url).name
+
         if out_fp.exists() and out_fp.stat().st_size != 0 and not reprocess:
             return out_fp
-        
+
         for attempt in range(retries):
             try:
-                download_url(url, out_directory, session=session)
-                break
-            except Exception as e:
+                r = session.get(url, stream=True, timeout=timeout)
+                r.raise_for_status()
+
+                # Fast streaming write
+                with open(out_fp, "wb") as f:
+                    for chunk in r.iter_content(chunk_size=256 * 1024):
+                        if chunk:
+                            f.write(chunk)
+                return out_fp
+
+            except Exception:
                 if attempt == retries - 1:
-                    raise e
-                time.sleep(2)
+                    raise
+                time.sleep(1.5)
+
         return out_fp
 
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = {executor.submit(download_one, url): url for url in urls}
-        for future in tqdm(as_completed(futures), total=len(futures), desc="Downloading URLs"):
-            download_fps.append(future.result())
-    
-    return download_fps
+    # multi-threaded dispatch
+    download_fps = []
+    with ThreadPoolExecutor(max_workers=max_workers) as ex:
+        futures = {ex.submit(download_one, url): url for url in urls}
+        for fut in tqdm(as_completed(futures), total=len(urls), desc="Downloading"):
+            download_fps.append(fut.result())
 
+    return download_fps
 
 def decompress(infile, tofile):
     """

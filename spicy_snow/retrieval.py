@@ -17,7 +17,7 @@ sys.path.append(expanduser('../'))
 
 # import functions for downloading
 from spicy_snow.find_data import get_sentinel1_urls, find_snowcover_urls
-from spicy_snow.processing.generate_dataarrays import generate_sentinel1_dataarray, generate_sentinel1_zarr,\
+from spicy_snow.processing.generate_dataarrays import generate_sentinel1_dataarray,\
     generate_snowcover_dataarray, generate_forest_fraction_dataarray, convert_snowcover_dates_to_s1_overpasses
 
 # import functions for pre-processing
@@ -69,11 +69,10 @@ def retrieve_snow_depth(aoi: shapely.geometry.Polygon,
     image acquistions in area and dates
     """
 
-    ## argument checking
+    # -- preflight checks -- #
     aoi = validate_aoi(aoi)
     dates = validate_dates(*dates)
 
-    work_dir = Path(work_dir)
     assert isinstance(debug, bool), f"Debug keyword must be boolean. Got {debug}"
     assert isinstance(params, list) or isinstance(params, tuple), f"param keyword must be list or tuple. Got {type(params)}"
     assert len(params) == 3, f"List of params must be 3 in order A, B, C. Got {params}"
@@ -82,59 +81,48 @@ def retrieve_snow_depth(aoi: shapely.geometry.Polygon,
     assert wet_snow_thresh < 0, f"Wet snow threshold set at {wet_snow_thresh}. This value is positive but should be negative."
     assert freezing_snow_thresh > 0, f"Refreeze threshold set at {freezing_snow_thresh}. This value is negative but should be positive."
 
-
     if outfp is not None:
         outfp = Path(outfp).expanduser().resolve()
         assert outfp.parent.exists(), f"Out filepath {outfp}'s directory does not exist"
 
-    ## set up directories and logging
+    # -- Setting up directories and logging -- #
+    work_dir = Path(work_dir)
     os.makedirs(work_dir, exist_ok = True)
 
     setup_logging(log_dir = join(work_dir, 'logs'), debug = debug)
     log = logging.getLogger(__name__)
 
-    # get main stem
+    # get main stem for automated file naming
     work_stem = f'{pd.to_datetime(dates[0]).date()}_{pd.to_datetime(dates[1]).date()}' if work_dir is not None else work_stem
     
-    ## Downloading Steps
+    # -- Downloading S1, FCF, Snowcover -- #
+
+    # start with Sentinel-1 #
+    log.info("Downloading sentinel-1 gamma0 backscatter data")
 
     # get sentinel 1 data search results
     s1_urls = get_sentinel1_urls(start_date = dates[0], stop_date = dates[1], aoi = aoi)
     # Keep only necessary downloads vv, vh, mask.
     s1_urls = [u for u in s1_urls if u.endswith(('_VV.tif', '_VH.tif', '_mask.tif'))]
+    # download sentinel urls
+    s1_fps = download_urls_parallel(s1_urls, work_dir.joinpath('opera'))
 
-    parralel_memmap = True if len(s1_urls) > 500 else False
-    # TODO change for testing...
-    parralel_memmap = True
-
-    # if greater than 500 opera images use parralel downloads
-    if parralel_memmap:
-        s1_fps = download_urls_parallel(s1_urls, work_dir.joinpath('opera'))
-    else:
-        s1_fps = download_urls(s1_urls, work_dir.joinpath('opera'))
-    
     # generate dataset and start to save s1 data vars. Use zarr to reduce memory load for big arrays
     ds = xr.Dataset()
-    if parralel_memmap:
-        ds['vv'] = generate_sentinel1_zarr(s1_fps, aoi, pol = 'VV', zarr_path = work_dir.joinpath(f'{work_stem}.vv.zarr'))
-    else:
-        ds['vv'] = generate_sentinel1_dataarray(s1_fps, aoi, pol = 'VV')
+    ds['vv'] = generate_sentinel1_dataarray(s1_fps, aoi, pol = 'VV')
 
     # grab spatial reference from first time step of VV
-    spatial_reference = ds['vv'].isel(time =0)
+    spatial_reference = ds['vv'].isel(time = 0)
 
     # repeat combining and spatial resampling for VH
-    if parralel_memmap:
-        ds['vh'] = generate_sentinel1_zarr(s1_fps, aoi, pol = 'VH', ref = spatial_reference, zarr_path = work_dir.joinpath(f'{work_stem}.vh.zarr'))
-    else:
-        ds['vh'] = generate_sentinel1_dataarray(s1_fps, aoi, pol = 'VH', ref = spatial_reference)
+    ds['vh'] = generate_sentinel1_dataarray(s1_fps, aoi, pol = 'VH', ref = spatial_reference)
     
+    # next VIIRS snowcover #
+    log.info("Downloading VIIRS snowcover data")
+
     # download viirs snow cover fraction for each sentinel 1 overpass date
     snowcover_urls = find_snowcover_urls(start_date = dates[0], stop_date = dates[1], date_list = ds.time.dt.date, aoi = aoi)
-    if parralel_memmap:
-        snowcover_fps = download_urls_parallel(snowcover_urls, work_dir.joinpath('snowcover'))
-    else:
-        snowcover_fps = download_urls(snowcover_urls, work_dir.joinpath('snowcover'))
+    snowcover_fps = download_urls_parallel(snowcover_urls, work_dir.joinpath('snowcover'))
 
     # generate snow cover dataset
     viirs_snowcover = generate_snowcover_dataarray(snowcover_fps, ref = spatial_reference)
@@ -148,20 +136,20 @@ def retrieve_snow_depth(aoi: shapely.geometry.Polygon,
     # set pixels with over 10% snow cover to snowcovered
     ds['snowcover'] = (viirs_snowcover.where(viirs_snowcover <= 100) > 10).astype(int)
     
+    # finally NLCD or Proba-V forest cover fraction #
+    log.info("Downloading forest cover fraction data")
     # download fcf and add to dataset ['fcf'] keyword
     # this will us NLCD for within US (very fast) or Proba-v for global (very slow)
     ds['fcf'] = generate_forest_fraction_dataarray(aoi, ref = spatial_reference)
 
-    return ds
-
-    ## Preprocessing Steps
+    # -- Preprocessing Sentinel-1 backscatter -- #
     log.info("Preprocessing Sentinel-1 images")
 
-    # add water mask
+    # water mask dataset
     ds = ims_water_mask(ds)
 
     # mask out outliers in incidence angle
-    # no longer used. Using opera's included shadow and layover mask
+    # no longer used. Using opera's included shadow and layover mask generate_dataset
     # ds = s1_incidence_angle_masking(ds)
     
     # convert from gamma0 amplitude to dB
@@ -172,7 +160,7 @@ def retrieve_snow_depth(aoi: shapely.geometry.Polygon,
     # clip outlier values of backscatter to overall mean
     ds = s1_clip_outliers(ds)
 
-    ## Snow Index Steps
+    # -- Calulating Snow Index -- #
     log.info("Calculating snow index")
     # calculate delta CR and delta VV
     ds = calc_delta_cross_ratio(ds, A = A)
@@ -207,6 +195,9 @@ def retrieve_snow_depth(aoi: shapely.geometry.Polygon,
     ds.attrs['param_C'] = C
 
     ds.attrs['bounds'] = aoi.bounds
+
+    # set dimensions in rioxarray order
+    ds = ds.transpose("time", "y", "x")
 
     if outfp:
         outfp = str(outfp)

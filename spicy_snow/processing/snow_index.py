@@ -121,7 +121,6 @@ def calc_delta_gamma(dataset: xr.Dataset, B: float = 0.5) -> Union[None, xr.Data
     dataset: Xarray Dataset of sentinel images with delta-gamma added as band
     """
     # check to ensure fcf is 0-1 not 0-100
-    print(dataset['fcf'])
     assert dataset['fcf'].max() <= 1, "Forest cover fraction must be scaled 0-1"
     assert dataset['fcf'].min() >= 0, "Forest cover fraction must be scaled 0-1"
 

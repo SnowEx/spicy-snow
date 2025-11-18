@@ -156,7 +156,7 @@ def ims_water_mask(dataset: xr.Dataset) -> xr.Dataset:
 
     assert 'watermask' in dataset.data_vars
 
-    dataset = dataset.where(dataset['watermask'] == 1)
+    dataset = dataset.where(dataset['watermask'] != 1)
 
     return dataset
 

@@ -6,12 +6,18 @@ import numpy as np
 import pandas as pd
 import geopandas as gpd
 import xarray as xr
-import dask
 
 from shapely.geometry import box, Polygon
 import h5py
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
+# faster reprojection utils
+import rasterio
+from rasterio.warp import reproject, Resampling
+from rasterio.enums import Resampling as Rsmp
+
+# multithreading
+from concurrent.futures import ThreadPoolExecutor
 # forest cover
 import pygeohydro as gh
 
@@ -24,9 +30,7 @@ from download import download_proba_v
 import logging
 log = logging.getLogger(__name__)
 
-def init_output(ref_da, times, tracks, pol="vv", zarr_path = None):
-    path = Path(zarr_path)
-
+def preallocate_output(ref_da, times, zarr_path = None):
     y = ref_da["y"]
     x = ref_da["x"]
 
@@ -36,131 +40,215 @@ def init_output(ref_da, times, tracks, pol="vv", zarr_path = None):
     )
 
     da = xr.DataArray(
-        data,  # the actual array: shape (time, y, x)
+        data,
         dims=("time", "y", "x"),
         coords={
             "time": times,
             "y": y,
             "x": x,
-            "track": ("time", tracks),
-        },
-        name=pol,  # name of the variable
+        }
     )
+    
+    # save spatial reference information
+    da = da.rio.write_crs(ref_da.rio.crs)
+    da = da.rio.write_transform(ref_da.rio.transform())
 
     if zarr_path is not None:
-        da.to_zarr(path, mode="w")
+        zarr_path = Path(zarr_path)
+        da.to_zarr(zarr_path, mode="w")
 
     return da
 
-def generate_sentinel1_zarr(s1_fps, aoi, pol, zarr_path = None, ref = None, resolution=(100, 100)):
+import numpy as np
+import xarray as xr
+import rasterio
+from rasterio.warp import reproject, Resampling
+from rasterio.enums import Resampling as Rsmp
+from concurrent.futures import ThreadPoolExecutor
+from tqdm.auto import tqdm
+
+
+def generate_sentinel1_dataarray(
+    s1_fps,
+    aoi,
+    pol,
+    zarr_path=None,
+    ref=None,
+    resolution=(100, 100),
+    max_workers=8,
+):
+
     aoi = validate_aoi(aoi)
     pol = pol.lower()
 
-    times = []
-    tracks = []
-
+    # Filter relevant products
     pol_fps = [f for f in s1_fps if f.stem.lower().endswith(pol)]
 
-    # First pass — collect timestamps
+    # Extract timestamps + tracks
+    times = []
+    tracks = []
     for fp in pol_fps:
-        if fp.stem.lower().endswith(pol):
-            t = pd.to_datetime(fp.stem.split('_')[4], format='%Y%m%dT%H%M%SZ')
-            times.append(t)
+        t = pd.to_datetime(fp.stem.split('_')[4], format='%Y%m%dT%H%M%SZ')
+        times.append(t)
 
-            track = int(fp.stem.split('_')[3].split('-')[0][1:])
-            tracks.append(track)
+        track = int(fp.stem.split('_')[3].split('-')[0][1:])
+        tracks.append(track)
 
-    # Build reference grid from first file
+    # ---- Build reference grid ----
     if ref is None:
         ref = xr.open_dataarray(pol_fps[0], chunks="auto")[0]
-        assert ref.rio.crs.is_projected, f'Unable to set spatial resolution with non-projected crs: {ref.rio.crs}'
-
+        assert ref.rio.crs.is_projected
         ref = ref.rio.reproject(dst_crs=ref.rio.crs, resolution=resolution)
         ref = ref.rio.reproject("EPSG:4326")
-        ref = ref.rio.clip_box(*box(*aoi).bounds).rio.pad_box(*box(*aoi).bounds)
+        ref = ref.rio.clip_box(*aoi.bounds).rio.pad_box(*aoi.bounds)
 
-    # Create empty on-disk dataset
-    zarr = init_output(
-        ref,
-        times,
-        tracks=tracks,
-        pol=pol,
-        zarr_path=zarr_path
-    )
+    dst_crs = ref.rio.crs
+    dst_transform = ref.rio.transform()
+    dst_shape = ref.shape  # (y, x)
 
-    # Write slices one-by-one
-    for fp, time in tqdm(zip(pol_fps, times, strict = True), desc=f"Merging s1 tifs for {pol}", total = len(times)):
-        img = xr.open_dataarray(fp, chunks="auto")[0]
-        img = img.rio.reproject_match(ref)
-        zarr.loc[dict(time = time)] = img
+    # ---- Preallocate Zarr-backed DataArray ----
+    zarr = preallocate_output(ref, times, zarr_path=zarr_path)
+    zarr = zarr.assign_coords(track=("time", tracks))
 
+    # Direct access to Zarr array (no .loc)
+    z = zarr.data
 
-    # Re-open final dataset (lazy)
-    if zarr_path is not None:
-        zarr = xr.open_zarr(zarr_path)
+    def process_one(args):
+        fp, idx = args
 
-    return zarr
+        with rasterio.open(fp) as src:
+            img = src.read(1).astype("float32")
 
-def generate_sentinel1_dataarray(s1_fps, aoi, pol, ref = None, resolution = 100, chunks= 'auto'):
-    """
-    Create an xarray.Dataset for a single polarization ('VV' or 'VH') from a list of files.
-
-    Args:
-        file_list (list[Path]): List of local files.
-        search_df (pandas dataframe): Search results used
-        area (shapely.geometry.Polygon): AOI for clipping/padding.
-        pol (str): Polarization to select ('VV' or 'VH').
-
-    Returns:
-        xarray.Dataset: Dataset with a single variable named 'VV' or 'VH', time dimension.
-    """
-    aoi = validate_aoi(aoi)
-    # file_to_row = map_files_to_asf_properties(file_list, search_df)
-    pol = pol.lower()
-    da_list = []
-
-    for fp in tqdm(s1_fps, desc = f"Merging s1 tifs for {pol}"):
-        if fp.stem.lower().endswith(pol):
-            
-            time = pd.to_datetime(fp.stem.split('_')[4], format = '%Y%m%dT%H%M%SZ')
-            track = int(fp.stem.split('_')[3].split('-')[0][1:])
-            satellite_number = fp.stem.split('_')[6]
-
-            mask_fp = fp.parent.joinpath(f'{fp.stem[:-3]}_mask.tif')
+            mask_fp = fp.parent / f"{fp.stem[:-3]}_mask.tif"
             if mask_fp.exists():
-                mask = xr.open_dataarray(mask_fp, chunks=chunks)[0]
-                # section 4.3 https://d2pn8kiwq2w21t.cloudfront.net/documents/ProductSpec_RTC-S1.pdf
-                # 0 = not affected by layover or shadow
-                mask = mask.where(mask == 0)
+                with rasterio.open(mask_fp) as m:
+                    mask = (m.read(1) == 0)
+                img = np.where(mask, img, np.nan)
 
+            # initialize with NaNs, not zeros
+            dst = np.full(dst_shape, np.nan, dtype="float32")
 
-            # for first s1 setup dataarray by subsetting to aoi
-            if ref is None: 
-                da = tif_to_dataarray(fp, mask = mask, time = time, area = aoi, spatial_resolution = resolution)
-                ref = da.isel(time = 0)
-            
-            # if reference file given reproject others to this coordinate grid
-            else:
-                da = tif_to_dataarray(fp, mask = mask, time = time, ref_da = ref)
-                        
-            # add relative orbit information
-            da = da.assign_coords(track = ('time', [track]))
+            reproject(
+                img,
+                dst,
+                src_transform=src.transform,
+                src_crs=src.crs,
+                dst_transform=dst_transform,
+                dst_crs=dst_crs,
+                resampling=Resampling.bilinear,
+                src_nodata=0,
+                dst_nodata=np.nan,
+            )
 
-            # add satellite information
-            da = da.assign_coords(platform = ('time', [satellite_number]))
-            
-            da_list.append(da)
+        return idx, dst
 
-    if not da_list:
-        return None
+    # ---- Parallel projection + writing ----
+    with ThreadPoolExecutor(max_workers=max_workers) as ex:
+        for idx, dst in tqdm(
+            ex.map(process_one, [(fp, i) for i, fp in enumerate(pol_fps)]),
+            total=len(pol_fps),
+            desc=f"Reprojecting + inserting {pol}",
+        ):
+            z[idx, :, :] = dst  # FAST direct Zarr write
 
-    # concatenate along time dimension
-    stacked = xr.concat(da_list, dim='time').sortby('time')
+    # Optionally collapse near-duplicate timesteps
+    out = combine_close_images(zarr.sortby("time"))
 
-    # next stack close times spatially
-    stacked = combine_close_images(stacked)
-    stacked.name = pol
-    return stacked
+    if zarr_path is not None:
+        out = xr.open_zarr(zarr_path)
+
+    return out
+
+def generate_sentinel1_dataarray(
+    s1_fps,
+    aoi,
+    pol,
+    zarr_path=None,
+    ref=None,
+    resolution=(100, 100),
+    max_workers=8,
+):
+
+    aoi = validate_aoi(aoi)
+    pol = pol.lower()
+
+    # Filter relevant products
+    pol_fps = [f for f in s1_fps if f.stem.lower().endswith(pol)]
+
+    # Extract timestamps + tracks
+    times = []
+    tracks = []
+    for fp in pol_fps:
+        t = pd.to_datetime(fp.stem.split('_')[4], format='%Y%m%dT%H%M%SZ')
+        times.append(t)
+
+        track = int(fp.stem.split('_')[3].split('-')[0][1:])
+        tracks.append(track)
+
+    # ---- Build reference grid ----
+    if ref is None:
+        ref = xr.open_dataarray(pol_fps[0], chunks="auto")[0]
+        assert ref.rio.crs.is_projected
+        ref = ref.rio.reproject(dst_crs=ref.rio.crs, resolution=resolution)
+        ref = ref.rio.reproject("EPSG:4326")
+        ref = ref.rio.clip_box(*aoi.bounds).rio.pad_box(*aoi.bounds)
+
+    dst_crs = ref.rio.crs
+    dst_transform = ref.rio.transform()
+    dst_shape = ref.shape  # (y, x)
+
+    # ---- Preallocate Zarr-backed DataArray ----
+    zarr = preallocate_output(ref, times, zarr_path=zarr_path)
+    zarr = zarr.assign_coords(track=("time", tracks))
+
+    # Direct access to Zarr array (no .loc)
+    z = zarr.data
+
+    def process_one(args):
+        fp, idx = args
+
+        with rasterio.open(fp) as src:
+            img = src.read(1).astype("float32")
+
+            mask_fp = fp.parent / f"{fp.stem[:-3]}_mask.tif"
+            if mask_fp.exists():
+                with rasterio.open(mask_fp) as m:
+                    mask = (m.read(1) == 0)
+                img = np.where(mask, img, np.nan)
+
+            # initialize with NaNs, not zeros
+            dst = np.full(dst_shape, np.nan, dtype="float32")
+
+            reproject(
+                img,
+                dst,
+                src_transform=src.transform,
+                src_crs=src.crs,
+                dst_transform=dst_transform,
+                dst_crs=dst_crs,
+                resampling=Resampling.bilinear,
+                src_nodata=0,
+                dst_nodata=np.nan,
+            )
+
+        return idx, dst
+
+    # ---- Parallel projection + writing ----
+    with ThreadPoolExecutor(max_workers=max_workers) as ex:
+        for idx, dst in tqdm(
+            ex.map(process_one, [(fp, i) for i, fp in enumerate(pol_fps)]),
+            total=len(pol_fps),
+            desc=f"Reprojecting + inserting {pol}",
+        ):
+            z[idx, :, :] = dst  # FAST direct Zarr write
+
+    # Optionally collapse near-duplicate timesteps
+    out = combine_close_images(zarr.sortby("time"))
+
+    if zarr_path is not None:
+        out = xr.open_zarr(zarr_path)
+
+    return out
 
 def generate_snowcover_dataarray(snowcover_fps, ref = None):
     # Organize tiles by date
