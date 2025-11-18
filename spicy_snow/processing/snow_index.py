@@ -196,6 +196,12 @@ def calc_prev_snow_index(dataset: xr.Dataset, current_time: np.datetime64, repea
     # slice dataset to get all images in previous period
     prev = dataset.sel(time = slice(t_oldest, t_youngest))
 
+    # TODO
+    # check this edge case of no previous data found.
+    if prev.sizes['time'] == 0:
+        prev_si = xr.zeros_like(dataset['snow_index'].isel(time=0))
+        return prev_si
+
     # calculate weights based on days between centered date and image acquistions
     day_weights = repeat.days - np.abs([int((t - t_prev).days) for t in prev.time.values])
     wts = xr.ones_like(prev['snow_index']) * day_weights

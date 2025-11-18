@@ -24,7 +24,7 @@ import pygeohydro as gh
 
 import sys
 sys.path.append('/Users/zmhoppinen/Documents/spicy-snow/spicy_snow/utils')
-from raster import tif_to_dataarray, combine_close_images, da_to01
+from raster import combine_close_images, da_to01
 from checks import validate_aoi, within_conus
 from download import download_proba_v
 
@@ -297,6 +297,9 @@ def convert_snowcover_dates_to_s1_overpasses(viirs_snowcover, s1_da):
     precise_snowcover = xr.zeros_like(s1_da)
     for s1_time in s1_da.time:
         mask = viirs_snowcover.time.dt.date == s1_time.dt.date
+        if len(viirs_snowcover.sel(time=mask)) == 0:
+            raise ValueError(f"No VIIRS snowcover found for S1 date {s1_time.values}")
+
         precise_snowcover.loc[dict(time = s1_time)] = viirs_snowcover.sel(time = mask).isel(time = 0)
     return precise_snowcover
 

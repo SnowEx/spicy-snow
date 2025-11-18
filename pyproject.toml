@@ -35,7 +35,7 @@ isort = "*"
 flake8 = "*"
 
 [tool.bumpversion]
-current_version = "0.2.1"
+current_version = "0.3.0"
 commit = true
 tag = true
 tag_name = "v{new_version}"
@@ -43,10 +43,10 @@ push = true
 push_remote = "origin"
 push_args = "--follow-tags"
 
-[tool.bumpversion:file:pyproject.toml]
-search = 'version = "{current_version}"'
-replace = 'version = "{new_version}"'
+[tool.bumpversion.file.setup_cfg]
+search = "version = {current_version}"
+replace = "version = {new_version}"
 
-[tool.bumpversion:file:spicy_snow/__init__.py]
-search = '__version__ = "{current_version}"'
-replace = '__version__ = "{new_version}"'
+[tool.bumpversion.file.s1_lia.__init__]
+search = "__version__ = \"{current_version}\""
+replace = "__version__ = \"{new_version}\""

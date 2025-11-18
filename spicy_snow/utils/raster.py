@@ -28,43 +28,6 @@ def da_to01(da: xr.DataArray, old_min=0, old_max=100) -> xr.DataArray:
 
     return (da - old_min) / (old_max - old_min)
 
-def tif_to_dataarray(fp, mask = None, time = None, area = None, ref_da = None, spatial_resolution=None, chunks = 'auto'):
-    """
-    Open a single band, reproject to EPSG:4326, clip and pad to AOI, assign time stamp.
-
-    If ref_da given it will try to reproject match those coordinates
-    If mask given we set all nan pixels in mask to nans.
-    """
-    import rioxarray as rxa    
-    img = xr.open_dataarray(fp, masked=True, chunks= chunks)[0]
-    
-    if mask is not None:
-        img = img.where(~mask.isnull())
-
-    if ref_da is not None:
-        img = img.rio.reproject_match(ref_da)
-
-    else:
-        if spatial_resolution is not None:
-            if isinstance(spatial_resolution, (int, float)):
-                spatial_resolution = (spatial_resolution, spatial_resolution)
-            img = img.rio.reproject(dst_crs=img.rio.crs, resolution=spatial_resolution)
-
-        img = img.rio.reproject('EPSG:4326')
-
-        if area is not None:
-            print(img)
-            # clip and pad ensures we either clip or pad to match AOI
-            img = img.rio.pad_box(*area.bounds)
-            img = img.rio.clip_box(*area.bounds, allow_one_dimensional_raster=True)
-            
-
-    if time is not None:
-        dt = pd.to_datetime(time)
-        img = img.expand_dims(time = [dt])
-
-    return img
-
 def mosaic_group(sub):
     # sub is a DataArray with 'time' dimension
     merged = reduce(lambda a, b: a.combine_first(b), [sub.isel(time=i) for i in range(sub.sizes['time'])])
@@ -90,7 +53,7 @@ def combine_close_images(da, time_tol = pd.Timedelta('2min')):
     )
 
     # cumulative sum adds when over time tolerance
-    groups = (time_diff > time_tol).cumsum(dim='time')
+    groups = (time_diff >= time_tol).cumsum(dim='time')
 
     # group images closer than time difference
     return da.groupby(groups).map(mosaic_group)

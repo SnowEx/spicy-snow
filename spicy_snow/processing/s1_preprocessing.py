@@ -172,6 +172,6 @@ def merge_s1_subsets(dataset_dictionary: Dict[str, xr.Dataset]) -> xr.Dataset:
     dataset: Xarray Dataset of all preprocessed sentinel images
     """
     # merge subsets of orbit/satellite into one Dataset
-    dataset = xr.merge(dataset_dictionary.values())
+    dataset = xr.merge(dataset_dictionary.values(), compat='override')
 
     return dataset
