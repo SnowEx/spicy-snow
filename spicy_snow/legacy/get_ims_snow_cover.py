@@ -4,7 +4,7 @@ Functions to download IMS snow-coverage images.
 https://usicecenter.gov/Products/ImsHome
 https://nsidc.org/data/user-resources/help-center/how-access-data-using-ftp-client-command-line-wget-or-python
 """
-
+import os
 import sys
 import shutil
 from datetime import datetime
@@ -20,7 +20,7 @@ import rioxarray as rxa
 import logging
 log = logging.getLogger(__name__)
 
-from spicy_snow.utils.download import url_download, decompress
+from spicy_snow.utils.download import decompress
 
 
 
@@ -49,12 +49,13 @@ def get_ims_day_data(year: str, doy: str, tmp_dir: str) -> xr.DataArray:
     # decompress .gz compression
     out_file = decompress(local_fp, local_fp.replace('.gz',''))
     # open as xarray dataArray
-    ims = rxa.open_rasterio(out_file, decode_times = False)
+    ims_str = '+proj=stere +lat_0=90 +lat_ts=60 +lon_0=-80 +k=1 +x_0=0 +y_0=0 +a=6378137 +b=6356257 +units=m +no_defs'
+    ims = xr.open_dataset(out_file, decode_times = False)['IMS_Surface_Values'].rio.write_crs(ims_str)
     os.chdir(cd)
     return ims
 
 
-def download_snow_cover(dataset: xr.Dataset, tmp_dir: str = './tmp', clean: bool = True) -> xr.Dataset:
+def download_snow_cover(days, ref, tmp_dir: str = './tmp', clean: bool = True) -> xr.Dataset:
     """
     Download IMS snow-cover images.
 
@@ -67,28 +68,28 @@ def download_snow_cover(dataset: xr.Dataset, tmp_dir: str = './tmp', clean: bool
     None
     """
     # get list of days that we have Sentinel-1 data for
-    days = [pd.to_datetime(d) for d in dataset.time.values]
+    days = [pd.to_datetime(d) for d in days]
 
     all_ims = []
     for day in tqdm(days, desc = 'Downloading IMS snow-cover'):
         # download IMS data for this day and open with xarray
         ims = get_ims_day_data(day.year, f'{day.dayofyear:03}', tmp_dir = tmp_dir) #revert to clean = True at somepoint
+        # reproject and clip to match dataset
+        ims = ims.rio.reproject_match(ref)
         # add timestamp info
         ims = ims.assign_coords(time = [day])
-        # reproject and clip to match dataset
-        ims = ims.rio.reproject_match(dataset['s1'])
         # add day to list of ims days
         all_ims.append(ims)
     # make dataArray of all IMS images
     full_ims = xr.concat(all_ims, dim = 'time')
 
     # add dataArray of IMS to the sentinel-1 dataset with timestamp information
-    dataset = xr.merge([dataset, full_ims.rename('ims')])
+    # dataset = xr.merge([dataset, full_ims.rename('ims')])
     
     # remove data directory of downloaded IMS tifs
     if clean == True:
         shutil.rmtree(tmp_dir)
     
-    return dataset
+    return full_ims
 
 # End of file

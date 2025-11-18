@@ -24,8 +24,13 @@ from typing import Dict, Tuple, List, Union
 import sys
 from os.path import expanduser
 sys.path.append(expanduser('~/Documents/spicy-snow'))
-from spicy_snow.utils.download import url_download
-from spicy_snow.processing.s1_preprocessing import s1_power_to_dB
+from asf_search import download_url as url_download
+import sys
+from pathlib import Path
+project_root = Path(__file__).resolve().parent.parent.parent.parent
+sys.path.insert(0, str(project_root))
+
+from spicy_snow.processing.s1_preprocessing import amplitude_to_dB as s1_power_to_dB
 
 import logging
 log = logging.getLogger(__name__)
