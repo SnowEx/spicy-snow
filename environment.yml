@@ -1,14 +1,20 @@
 name: spicy
 channels:
- - conda-forge
- - defaults
+  - conda-forge
+  - defaults
 dependencies:
- - numpy
- - pandas
- - xarray
- - rioxarray
- - shapely
- - hyp3_sdk
- - asf_search
- - matplotlib
- - netcdf4
+  - python>=3.9
+  - numpy
+  - pandas
+  - xarray
+  - rioxarray
+  - shapely
+  - asf_search
+  - matplotlib
+  - netcdf4
+  - rasterio
+  - pyproj
+  - earthaccess
+  - dask
+  - zarr
+  - h5py

@@ -7,7 +7,7 @@ import pandas as pd
 import geopandas as gpd
 import xarray as xr
 
-from shapely.geometry import box, Polygon
+from shapely.geometry import box
 import h5py
 from tqdm.auto import tqdm
 
@@ -18,6 +18,7 @@ from rasterio.enums import Resampling as Rsmp
 
 # multithreading
 from concurrent.futures import ThreadPoolExecutor
+
 # forest cover
 import pygeohydro as gh
 
@@ -58,15 +59,6 @@ def preallocate_output(ref_da, times, zarr_path = None):
         da.to_zarr(zarr_path, mode="w")
 
     return da
-
-import numpy as np
-import xarray as xr
-import rasterio
-from rasterio.warp import reproject, Resampling
-from rasterio.enums import Resampling as Rsmp
-from concurrent.futures import ThreadPoolExecutor
-from tqdm.auto import tqdm
-
 
 def generate_sentinel1_dataarray(
     s1_fps,

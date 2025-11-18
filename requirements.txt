@@ -3,6 +3,9 @@ pandas
 xarray
 rioxarray
 shapely
-hyp3_sdk
 asf_search
 matplotlib
+h5py
+zarr
+pygeohydro
+earthaccess
