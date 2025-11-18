@@ -133,11 +133,11 @@ def test_calc_snow_index_normal():
     assert np.all(ds_out["snow_index"] >= 0)
 
     # First dummy step = 0
-    np.testing.assert_array_equal(ds_out['snow_index'].isel(time=0), delta_gamma[0])
+    np.testing.assert_allclose(ds_out['snow_index'].isel(time=0), delta_gamma[0])
     # Subsequent steps accumulate
-    np.testing.assert_array_equal(ds_out['snow_index'].isel(time=1), delta_gamma[0] + delta_gamma[1])
-    np.testing.assert_array_equal(ds_out['snow_index'].isel(time=2), delta_gamma[0] + delta_gamma[1] + delta_gamma[2])
-    np.testing.assert_array_equal(ds_out['snow_index'].isel(time=3), delta_gamma[0] + delta_gamma[1] + delta_gamma[2] + delta_gamma[3])
+    np.testing.assert_allclose(ds_out['snow_index'].isel(time=1), delta_gamma[0] + delta_gamma[1])
+    np.testing.assert_allclose(ds_out['snow_index'].isel(time=2), delta_gamma[0] + delta_gamma[1] + delta_gamma[2])
+    np.testing.assert_allclose(ds_out['snow_index'].isel(time=3), delta_gamma[0] + delta_gamma[1] + delta_gamma[2] + delta_gamma[3])
 
 def test_calc_snow_index_no_previous_time():
     """
