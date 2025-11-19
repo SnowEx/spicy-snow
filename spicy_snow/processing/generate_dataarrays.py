@@ -25,12 +25,10 @@ from concurrent.futures import ThreadPoolExecutor
 # forest cover
 import pygeohydro as gh
 
-import sys
-sys.path.append('/Users/zmhoppinen/Documents/spicy-snow/spicy_snow/utils')
-from raster import combine_close_images, da_to01
-from checks import validate_aoi, within_conus
-from download import download_proba_v
-from geometry import generate_point_transform
+from spicy_snow.utils.raster import combine_close_images, da_to01
+from spicy_snow.utils.checks import validate_aoi, within_conus
+from spicy_snow.utils.download import download_proba_v
+from spicy_snow.utils.geometry import generate_point_transform
 
 import logging
 log = logging.getLogger(__name__)

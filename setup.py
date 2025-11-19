@@ -33,7 +33,7 @@ URL = 'https://github.com/SnowEx/spicy-snow'
 EMAIL = 'zachhoppinen@gmail.com'
 AUTHOR = 'Zach Hoppinen'
 REQUIRES_PYTHON = '>=3.9.0'
-VERSION = '0.0.1'
+VERSION = '0.2.1'
 
 # What packages are required for this module to be executed?
 REQUIRED = [

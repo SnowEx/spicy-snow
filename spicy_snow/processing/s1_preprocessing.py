@@ -12,9 +12,9 @@ import rioxarray
 from rioxarray.merge import merge_arrays
 from itertools import product
 
-import sys
-sys.path.append('/Users/zmhoppinen/Documents/spicy-snow/spicy_snow')
-from spicy_constants import s1_dual_pols
+# import sys
+# sys.path.append('/Users/zmhoppinen/Documents/spicy-snow/spicy_snow')
+from spicy_snow.spicy_constants import s1_dual_pols
 
 import logging
 log = logging.getLogger(__name__)
