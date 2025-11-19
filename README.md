@@ -50,10 +50,16 @@ out_nc = Path('./test.nc').resolve()
 # default is 100 meters
 spatial_resolution = 100
 
+# data source can be either "opera" RTC or "hyp3" cloud processed
+# opera is much faster and doesn't require hyp3 credits
+# hyp3 uses gamma processing and may be cleaner
+source = 'opera' # other option "hyp3"
+
 spicy_ds = retrieve_snow_depth(aoi = test_aoi, dates = dates, 
                                work_dir = Path('./spicy-test/').resolve(), 
                                resolution = spatial_resolution,
                                debug=False,
+                               source = source
                                outfp=out_nc)
 ```
 

@@ -19,8 +19,9 @@ from tqdm import tqdm
 
 from shapely.geometry import box, Polygon
 
-from spicy_snow.utils.checks import validate_aoi, validate_dates, within_conus
-from spicy_snow.utils.spicy_logging import temp_silence_logger
+from spicy_snow.utils.checks import validate_aoi, validate_dates
+from spicy_snow.hyp3_pipeline import hyp3_pipeline
+
 import logging
 log = logging.getLogger(__name__)
 
@@ -48,7 +49,7 @@ def find_snowcover_urls(aoi, start_date = None, stop_date = None, date_list = No
 
     return snowcover_urls
 
-def get_sentinel1_urls(start_date, stop_date, aoi, source = 'opera'):
+def get_sentinel1_urls(start_date, stop_date, aoi, source = 'opera', job_name = None):
     """
     Query ASF (Alaska Satellite Facility) for Sentinel-1 SAR products over a given AOI and date range.
 
@@ -70,6 +71,9 @@ def get_sentinel1_urls(start_date, stop_date, aoi, source = 'opera'):
         ValueError: If an unknown source string is provided.
         AssertionError / IndexError: If AOI or dates are invalid (delegated to validate_aoi / validate_dates).
     """
+    
+    assert source in ['opera', 'hyp3'], "Source must be either 'opera' or 'hyp3'"
+
     aoi = validate_aoi(aoi)
     start_date, stop_date = validate_dates(start_date, stop_date)
 
@@ -87,15 +91,40 @@ def get_sentinel1_urls(start_date, stop_date, aoi, source = 'opera'):
                    processingLevel = product_type, 
                    platform = platform)
     
+
     results_df = pd.json_normalize(results.geojson(), record_path = ['features'])
 
-    sentinel1_urls = get_urls_from_asf_search(results_df)
+    if source == 'opera':
+        # short-circuit and return opera urls
+        opera_urls = get_opera_urls_from_asf_search(results_df)
+        return opera_urls
+    
+    if job_name is None:
+        job_name = f'spicy_snow_hyp3_{pd.Timestamp.now().strftime("%Y%m%d_%H%M%S")}'
+        log.debug(f"No job name provided. Using generated name: {job_name}")
 
-    return sentinel1_urls
+    rtc_jobs = hyp3_pipeline(results_df, job_name = job_name, existing_job_name = job_name)
+    hyp3_urls = get_hy3p_urls_from_jobs(rtc_jobs)
+    return hyp3_urls
 
-def get_urls_from_asf_search(asf_results_df):
+
+def get_hy3p_urls_from_jobs(rtc_jobs):
     """
-    Convert dataframe of ASF search results to urls.
+    Extract download URLs from completed HyP3 RTC jobs.
+    """
+    urls = []
+
+    for job in rtc_jobs:
+        u = job.files[0]['url']
+        urls.append(u.replace('.zip', '_VV.tif'))
+        urls.append(u.replace('.zip', '_VH.tif'))
+
+    return urls
+
+
+def get_opera_urls_from_asf_search(asf_results_df):
+    """
+    Convert dataframe of ASF search results to opera urls.
     """
     urls = []
 
@@ -107,6 +136,9 @@ def get_urls_from_asf_search(asf_results_df):
         extras = row.get('properties.additionalUrls', [])
         if extras:
             urls.extend(extras)
+    
+    # only return relevant opera files
+    urls = [u for u in urls if u.endswith(('_VV.tif', '_VH.tif', '_mask.tif'))]
 
     return urls
 

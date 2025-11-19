@@ -20,6 +20,7 @@ REQUIRED = [
     'rioxarray',
     'shapely',
     'asf_search',
+    'hyp3_sdk',
     'earthaccess',
     'matplotlib',
     'netcdf4',

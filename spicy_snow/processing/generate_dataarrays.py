@@ -13,6 +13,8 @@ from pyproj import Transformer
 import h5py
 from tqdm.auto import tqdm
 
+import asf_search as asf
+
 # faster reprojection utils
 import rasterio
 from rasterio.warp import reproject, Resampling
@@ -59,99 +61,6 @@ def preallocate_output(times, y, x, dtype, crs, transform, zarr_path = None):
         da.to_zarr(zarr_path, mode="w")
 
     return da
-# def generate_sentinel1_dataarray(
-#     s1_fps,
-#     aoi,
-#     pol,
-#     zarr_path=None,
-#     ref=None,
-#     resolution=(100, 100),
-#     max_workers=8,
-# ):
-
-#     aoi = validate_aoi(aoi)
-#     pol = pol.lower()
-
-#     # Filter relevant products
-#     pol_fps = [f for f in s1_fps if f.stem.lower().endswith(pol)]
-
-#     # Extract timestamps + tracks
-#     times = []
-#     tracks = []
-#     for fp in pol_fps:
-#         t = pd.to_datetime(fp.stem.split('_')[4], format='%Y%m%dT%H%M%SZ')
-#         times.append(t)
-
-#         track = int(fp.stem.split('_')[3].split('-')[0][1:])
-#         tracks.append(track)
-
-#     # ---- Build reference grid ----
-#     if ref is None:
-#         ref = xr.open_dataarray(pol_fps[0], chunks="auto")[0]
-#         assert ref.rio.crs.is_projected
-#         ref = ref.rio.reproject(dst_crs=ref.rio.crs, resolution=resolution)
-#         ref = ref.rio.reproject("EPSG:4326")
-#         if isinstance(aoi, box):
-#             ref = ref.rio.clip_box(*aoi.bounds).rio.pad_box(*aoi.bounds)
-#         elif isinstance(aoi, Point):
-#             ref = ref.sel(x = aoi.x, y = aoi.y, method = 'nearest')
-
-#     dst_crs = ref.rio.crs
-#     dst_transform = ref.rio.transform()
-#     dst_shape = ref.shape  # (y, x)
-
-#     # ---- Preallocate Zarr-backed DataArray ----
-#     zarr = preallocate_output(ref, times, zarr_path=zarr_path)
-#     zarr = zarr.assign_coords(track=("time", tracks))
-
-#     # Direct access to Zarr array (no .loc)
-#     z = zarr.data
-
-#     def process_one(args):
-#         fp, idx = args
-
-#         with rasterio.open(fp) as src:
-#             img = src.read(1).astype("float32")
-
-#             mask_fp = fp.parent / f"{fp.stem[:-3]}_mask.tif"
-#             if mask_fp.exists():
-#                 with rasterio.open(mask_fp) as m:
-#                     mask = (m.read(1) == 0)
-#                 img = np.where(mask, img, np.nan)
-
-#             # initialize with NaNs, not zeros
-#             dst = np.full(dst_shape, np.nan, dtype="float32")
-
-#             reproject(
-#                 img,
-#                 dst,
-#                 src_transform=src.transform,
-#                 src_crs=src.crs,
-#                 dst_transform=dst_transform,
-#                 dst_crs=dst_crs,
-#                 resampling=Resampling.bilinear,
-#                 src_nodata=0,
-#                 dst_nodata=np.nan,
-#             )
-
-#         return idx, dst
-
-#     # ---- Parallel projection + writing ----
-#     with ThreadPoolExecutor(max_workers=max_workers) as ex:
-#         for idx, dst in tqdm(
-#             ex.map(process_one, [(fp, i) for i, fp in enumerate(pol_fps)]),
-#             total=len(pol_fps),
-#             desc=f"Reprojecting + inserting {pol}",
-#         ):
-#             z[idx, :, :] = dst  # FAST direct Zarr write
-
-#     # Optionally collapse near-duplicate timesteps
-#     out = combine_close_images(zarr.sortby("time"))
-
-#     if zarr_path is not None:
-#         out = xr.open_zarr(zarr_path)
-
-#     return out
 
 def sel_1point_da_to_2d_array(da, y, x, crs, transform):
     da = da.sel(x = x, y = y, method = 'nearest')
@@ -200,11 +109,10 @@ def sample_resampled_average(src, img, aoi, target_res):
     col_tgt = int(col_src / scale_x)
 
     # ---- 6. Original window that corresponds to this target cell ----
-    r0 = int(row_tgt * scale_y)
-    r1 = int((row_tgt + 1) * scale_y)
-
-    c0 = int(col_tgt * scale_x)
-    c1 = int((col_tgt + 1) * scale_x)
+    r0 = int(np.floor(row_tgt * scale_y))
+    r1 = int(np.ceil((row_tgt + 1) * scale_y))
+    c0 = int(np.floor(col_tgt * scale_x))
+    c1 = int(np.ceil((col_tgt + 1) * scale_x))
 
     # Clip to bounds
     r0 = max(0, r0); r1 = min(img.shape[0], r1)
@@ -213,56 +121,6 @@ def sample_resampled_average(src, img, aoi, target_res):
     # ---- 7. Compute average of the resampled cell ----
     window = img[r0:r1, c0:c1]
     return np.nanmean(window)
-
-def bilinear_resampled_value(src, img, aoi, target_res):
-    """
-    Bilinear interpolation at AOI as if the raster were resampled 
-    to target_res via rasterio.reproject(..., bilinear).
-    """
-    # --- CRS transform ---
-    transformer = Transformer.from_crs("EPSG:4326", src.crs, always_xy=True)
-    x, y = transformer.transform(aoi.x, aoi.y)
-
-    # --- Original pixel size ---
-    xres_src, yres_src = src.res
-    yres_src = abs(yres_src)
-
-    # --- Target pixel size ---
-    xres_tgt, yres_tgt = target_res
-    yres_tgt = abs(yres_tgt)
-
-    # --- Fractions in the target grid ---
-    row_src, col_src = rasterio.transform.rowcol(src.transform, x, y, op=float)
-    row_tgt = row_src * (yres_src / yres_tgt)
-    col_tgt = col_src * (xres_src / xres_tgt)
-
-    # --- Back-map to fractional original indices ---
-    row_f = row_tgt * (yres_tgt / yres_src)
-    col_f = col_tgt * (xres_tgt / xres_src)
-
-    r0 = int(np.floor(row_f))
-    c0 = int(np.floor(col_f))
-    r1 = r0 + 1
-    c1 = c0 + 1
-
-    # bounds check
-    if r0 < 0 or c0 < 0 or r1 >= img.shape[0] or c1 >= img.shape[1]:
-        return np.nan
-
-    # --- 4 neighbors from the original raster ---
-    Q11 = img[r0, c0]
-    Q21 = img[r0, c1]
-    Q12 = img[r1, c0]
-    Q22 = img[r1, c1]
-
-    dr = row_f - r0
-    dc = col_f - c0
-
-    # --- Bilinear interpolation ---
-    top = Q11 * (1-dc) + Q21 * dc
-    bottom = Q12 * (1-dc) + Q22 * dc
-    return top * (1-dr) + bottom * dr
-
 
 def generate_sentinel1_dataarray(
     s1_fps,
@@ -286,10 +144,19 @@ def generate_sentinel1_dataarray(
     times = []
     tracks = []
     for fp in pol_fps:
-        t = pd.to_datetime(fp.stem.split('_')[4], format='%Y%m%dT%H%M%SZ')
-        times.append(t)
+        print(fp)
+        if 'opera' in fp.stem.lower():
+            t = pd.to_datetime(fp.stem.split('_')[4], format='%Y%m%dT%H%M%SZ')
+            track = int(fp.stem.split('_')[3].split('-')[0][1:])
+        else:
+            t = pd.to_datetime(fp.stem.split('_')[2], format='%Y%m%dT%H%M%S')
+            # get granule metadata
+            results = asf.search(start = t, end = t, platform = 'SENTINEL-1', processingLevel= asf.PRODUCT_TYPE.GRD_HD)
+            paths = [r.properties['pathNumber'] for r in results]
+            track = paths[0] if len(set(paths)) == 1 else None
+            assert track is not None, f"Could not uniquely determine track for {fp.name} acquired at {t}"
 
-        track = int(fp.stem.split('_')[3].split('-')[0][1:])
+        times.append(t)
         tracks.append(track)
 
     # ---- Build reference grid ----
@@ -334,6 +201,8 @@ def generate_sentinel1_dataarray(
                 with rasterio.open(mask_fp) as m:
                     mask = (m.read(1) == 0)
                 img = np.where(mask, img, np.nan)
+            else:
+                img = np.where(img != 0, img, np.nan)
 
             if isinstance(aoi, shapely.geometry.point.Point):
                 value = sample_resampled_average(src, img, aoi, resolution)
