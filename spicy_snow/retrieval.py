@@ -40,6 +40,7 @@ def retrieve_snow_depth(aoi: shapely.geometry.Polygon,
                         dates: Tuple[str, str], 
                         work_dir: str = './',
                         work_stem = None,
+                        resolution = 100,
                         debug: bool = False,
                         ims_masking: bool = True,
                         wet_snow_thresh: float = -2,
@@ -109,7 +110,7 @@ def retrieve_snow_depth(aoi: shapely.geometry.Polygon,
 
     # generate dataset and start to save s1 data vars. Use zarr to reduce memory load for big arrays
     ds = xr.Dataset()
-    ds['vv'] = generate_sentinel1_dataarray(s1_fps, aoi, pol = 'VV')
+    ds['vv'] = generate_sentinel1_dataarray(s1_fps, aoi, pol = 'VV', resolution = resolution)
 
     # grab spatial reference from first time step of VV
     spatial_reference = ds['vv'].isel(time = 0)

@@ -35,13 +35,11 @@ from geometry import generate_point_transform
 import logging
 log = logging.getLogger(__name__)
 
-def preallocate_output(ref_da, times, zarr_path = None):
-    y = ref_da["y"]
-    x = ref_da["x"]
+def preallocate_output(times, y, x, dtype, crs, transform, zarr_path = None):
 
     data = np.zeros(
         (len(times), len(y), len(x)),
-        dtype=ref_da.dtype,
+        dtype=dtype,
     )
 
     da = xr.DataArray(
@@ -63,7 +61,6 @@ def preallocate_output(ref_da, times, zarr_path = None):
         da.to_zarr(zarr_path, mode="w")
 
     return da
-
 # def generate_sentinel1_dataarray(
 #     s1_fps,
 #     aoi,
@@ -165,6 +162,110 @@ def da_to_2d_array(da, y, x, crs, transform):
     da = da.rio.write_crs(crs).rio.write_transform(transform)
     return da
 
+def sample_resampled_average(src, img, aoi, target_res):
+    """
+    Sample the VALUE of a resampled grid (with target resolution) at a point
+    without computing the whole resampled raster.
+
+    Parameters
+    ----------
+    src : rasterio dataset
+        Source raster (with src.transform & src.crs)
+    img : np.ndarray
+        2D array of original values
+    aoi : shapely Point (EPSG:4326)
+        Point to sample
+    target_res : tuple(float, float)
+        (xres_target, yres_target) for resampled grid
+    """
+
+    # ---- 1. Convert AOI: WGS84 -> raster CRS ----
+    transformer = Transformer.from_crs("EPSG:4326", src.crs, always_xy=True)
+    x, y = transformer.transform(aoi.x, aoi.y)
+
+    # ---- 2. Original raster resolution (may be negative) ----
+    xres_src, yres_src = src.res
+    yres_src = abs(yres_src)
+
+    xres_tgt, yres_tgt = target_res
+    yres_tgt = abs(yres_tgt)
+
+    # ---- 3. Scaling factor (# of original pixels per target pixel) ----
+    scale_x = xres_tgt / xres_src
+    scale_y = yres_tgt / yres_src
+
+    # ---- 4. Original pixel indices ----
+    row_src, col_src = rasterio.transform.rowcol(src.transform, x, y)
+
+    # ---- 5. Resampled pixel index ----
+    row_tgt = int(row_src / scale_y)
+    col_tgt = int(col_src / scale_x)
+
+    # ---- 6. Original window that corresponds to this target cell ----
+    r0 = int(row_tgt * scale_y)
+    r1 = int((row_tgt + 1) * scale_y)
+
+    c0 = int(col_tgt * scale_x)
+    c1 = int((col_tgt + 1) * scale_x)
+
+    # Clip to bounds
+    r0 = max(0, r0); r1 = min(img.shape[0], r1)
+    c0 = max(0, c0); c1 = min(img.shape[1], c1)
+
+    # ---- 7. Compute average of the resampled cell ----
+    window = img[r0:r1, c0:c1]
+    return np.nanmean(window)
+
+def bilinear_resampled_value(src, img, aoi, target_res):
+    """
+    Bilinear interpolation at AOI as if the raster were resampled 
+    to target_res via rasterio.reproject(..., bilinear).
+    """
+    # --- CRS transform ---
+    transformer = Transformer.from_crs("EPSG:4326", src.crs, always_xy=True)
+    x, y = transformer.transform(aoi.x, aoi.y)
+
+    # --- Original pixel size ---
+    xres_src, yres_src = src.res
+    yres_src = abs(yres_src)
+
+    # --- Target pixel size ---
+    xres_tgt, yres_tgt = target_res
+    yres_tgt = abs(yres_tgt)
+
+    # --- Fractions in the target grid ---
+    row_src, col_src = rasterio.transform.rowcol(src.transform, x, y, op=float)
+    row_tgt = row_src * (yres_src / yres_tgt)
+    col_tgt = col_src * (xres_src / xres_tgt)
+
+    # --- Back-map to fractional original indices ---
+    row_f = row_tgt * (yres_tgt / yres_src)
+    col_f = col_tgt * (xres_tgt / xres_src)
+
+    r0 = int(np.floor(row_f))
+    c0 = int(np.floor(col_f))
+    r1 = r0 + 1
+    c1 = c0 + 1
+
+    # bounds check
+    if r0 < 0 or c0 < 0 or r1 >= img.shape[0] or c1 >= img.shape[1]:
+        return np.nan
+
+    # --- 4 neighbors from the original raster ---
+    Q11 = img[r0, c0]
+    Q21 = img[r0, c1]
+    Q12 = img[r1, c0]
+    Q22 = img[r1, c1]
+
+    dr = row_f - r0
+    dc = col_f - c0
+
+    # --- Bilinear interpolation ---
+    top = Q11 * (1-dc) + Q21 * dc
+    bottom = Q12 * (1-dc) + Q22 * dc
+    return top * (1-dr) + bottom * dr
+
+
 def generate_sentinel1_dataarray(
     s1_fps,
     aoi,
@@ -172,8 +273,10 @@ def generate_sentinel1_dataarray(
     zarr_path=None,
     ref=None,
     resolution=(100, 100),
-    max_workers=8,
+    max_workers = 8
 ):
+    if isinstance(resolution, float) or isinstance(resolution, int):
+        resolution = (resolution, resolution)
 
     aoi = validate_aoi(aoi)
     pol = pol.lower()
@@ -208,7 +311,6 @@ def generate_sentinel1_dataarray(
     dst_crs = ref.rio.crs
     dst_transform = ref.rio.transform()
     dst_shape = ref.shape
-    
 
     # ---- Preallocate Zarr-backed DataArray ----
     zarr = preallocate_output(times, 
@@ -235,16 +337,12 @@ def generate_sentinel1_dataarray(
                     mask = (m.read(1) == 0)
                 img = np.where(mask, img, np.nan)
 
-            # initialize with NaNs, not zeros
             if isinstance(aoi, shapely.geometry.point.Point):
-                transformer = Transformer.from_crs(dst_crs, src.crs, always_xy=True)
-                x_utm, y_utm = transformer.transform(aoi.x, aoi.y)
-
-                row, col = rowcol(src.transform, x_utm, y_utm, op=round)
-                value = img[row, col]
+                value = sample_resampled_average(src, img, aoi, resolution)
                 dst = np.array([[value]], dtype=img.dtype)  # shape (1,1)
                 return idx, dst
 
+            # initialize with NaNs, not zeros
             dst = np.full(dst_shape, np.nan, dtype="float32")
 
             reproject(
