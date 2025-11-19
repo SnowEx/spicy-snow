@@ -10,14 +10,15 @@ DESCRIPTION = 'Snow Depth Retrievals from Sentinel-1 Backscatter.'
 URL = 'https://github.com/SnowEx/spicy-snow'
 EMAIL = 'zachhoppinen@gmail.com'
 AUTHOR = 'Zach Hoppinen'
-REQUIRES_PYTHON = '>=3.9.0'
+REQUIRES_PYTHON = '>=3.9,<3.12'
 
 REQUIRED = [
-    'numpy',
-    'pandas',
-    'xarray',
+    # 'numpy',
+    # 'pandas',
+    # 'xarray',
+    'geopandas',
     'rioxarray',
-    'shapely',
+    # 'shapely',
     'asf_search',
     'earthaccess',
     'matplotlib',
@@ -57,10 +58,4 @@ setup(
     install_requires=REQUIRED,
     include_package_data=True,
     license='MIT',
-    classifiers=[
-        'License :: OSI Approved :: MIT License',
-        'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.9',
-        'Programming Language :: Python :: Implementation :: CPython',
-    ],
 )
