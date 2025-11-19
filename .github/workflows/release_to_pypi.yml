@@ -63,14 +63,15 @@ jobs:
           release_name: ${{ env.TAG_NAME }}
           draft: false
           prerelease: false
-
-      # 🔟 Upload sdist to GitHub release
-      - name: Upload source distribution
-        uses: actions/upload-release-asset@v1
+          
+      # 🔟 Upload distributions to GitHub release
+      - name: Upload distributions
+        run: |
+          echo "Found dist files:"
+          ls dist/
+          for file in dist/*; do
+            echo "Uploading $file"
+            gh release upload ${{ env.TAG_NAME }} "$file"
+          done
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: dist/spicy_snow-${{ env.TAG_NAME }}.tar.gz
-          asset_name: spicy_snow-${{ env.TAG_NAME }}.tar.gz
-          asset_content_type: application/gzip
