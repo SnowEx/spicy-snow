@@ -35,7 +35,9 @@ jobs:
 
       # 5️⃣ Update setup.py version
       - name: Update version in setup.py
-        run: sed -i "s/{{VERSION_PLACEHOLDER}}/${{ env.TAG_NAME }}/g" setup.py
+        run: sed -i "s/{{VERSION_PLACEHOLDER}}/${TAG_NAME}/g" setup.py
+        env:
+          TAG_NAME: ${{ env.TAG_NAME }}
 
       # 6️⃣ Build distributions
       - name: Build distributions
