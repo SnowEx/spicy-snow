@@ -36,9 +36,15 @@ try:
 except FileNotFoundError:
     long_description = DESCRIPTION
 
+VERSION = "{{VERSION_PLACEHOLDER}}"  # placeholder for GitHub tag workflow
+
+# fallback for local/CI installs
+if VERSION == "{{VERSION_PLACEHOLDER}}":
+    VERSION = "0.3.0.dev0"
+
 setup(
     name=NAME,
-    version="{{VERSION_PLACEHOLDER}}",  # CI replaces this
+    version=VERSION,   # pass the resolved version here
     description=DESCRIPTION,
     long_description=long_description,
     long_description_content_type='text/markdown',
