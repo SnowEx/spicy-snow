@@ -52,7 +52,7 @@ def test_find_snowcover_urls(mock_search, example_aoi):
 # Tests for get_urls_from_asf_search
 # -----------------------------
 def test_get_urls_from_asf_search(example_results_df):
-    urls = fd.get_urls_from_asf_search(example_results_df)
+    urls = fd.get_opera_urls_from_asf_search(example_results_df)
     expected_urls = [
         'https://example.com/file1.tif',
         'https://example.com/file1_aux.tif',
