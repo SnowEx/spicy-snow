@@ -10,7 +10,7 @@ DESCRIPTION = 'Snow Depth Retrievals from Sentinel-1 Backscatter.'
 URL = 'https://github.com/SnowEx/spicy-snow'
 EMAIL = 'zachhoppinen@gmail.com'
 AUTHOR = 'Zach Hoppinen'
-REQUIRES_PYTHON = '>=3.9,<3.12'
+REQUIRES_PYTHON = '>=3.9,<=3.12'
 
 REQUIRED = [
     'numpy',

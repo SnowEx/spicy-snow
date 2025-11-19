@@ -153,7 +153,7 @@ def preallocate_output(times, y, x, dtype, crs, transform, zarr_path = None):
 
 #     return out
 
-def da_to_2d_array(da, y, x, crs, transform):
+def sel_1point_da_to_2d_array(da, y, x, crs, transform):
     da = da.sel(x = x, y = y, method = 'nearest')
     da = da.data.reshape(1, 1)
     da = xr.DataArray(da, dims = ['y', 'x'], coords = {'y': [y], 'x': [x]})
@@ -302,7 +302,7 @@ def generate_sentinel1_dataarray(
             crs = ref.rio.crs
             xres, yres = ref.rio.resolution()
             transform = generate_point_transform(x = aoi.x, y = aoi.y, xres = xres, yres = yres)
-            ref = da_to_2d_array(ref, aoi.y, aoi.x, crs, transform)
+            ref = sel_1point_da_to_2d_array(ref, aoi.y, aoi.x, crs, transform)
         else:
             ref = ref.rio.clip_box(*aoi.bounds).rio.pad_box(*aoi.bounds)
 
@@ -350,8 +350,8 @@ def generate_sentinel1_dataarray(
                 src_crs=src.crs,
                 dst_transform=dst_transform,
                 dst_crs=dst_crs,
-                resampling=Resampling.bilinear,
-                src_nodata=0,
+                resampling=Resampling.average,
+                src_nodata=np.nan,
                 dst_nodata=np.nan,
             )
 
