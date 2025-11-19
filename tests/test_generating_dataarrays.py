@@ -32,7 +32,7 @@ def test_preallocate_output_creates_da():
     da_ref = xr.DataArray(np.zeros((2,2)), dims=("y","x"), coords={"y":[0,1],"x":[0,1]})
     da_ref = da_ref.rio.write_crs("EPSG:4326")
     times = pd.date_range("2025-01-01", periods=3)
-    da_out = preallocate_output(da_ref, times)
+    da_out = preallocate_output(times, da_ref.y, da_ref.x, da_ref.dtype, da_ref.rio.crs, da_ref.rio.transform())
     assert da_out.sizes["time"] == 3
     assert da_out.sizes["y"] == 2
     assert da_out.sizes["x"] == 2

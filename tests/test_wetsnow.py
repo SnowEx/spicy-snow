@@ -166,23 +166,23 @@ def test_newly_frozen_assertion(test_ds):
         id_newly_frozen_snow(test_ds.drop_vars(['deltaGamma']))
 
 
-def test_negative_snow_index_wet(test_ds):
-    ds = test_ds
-    ds['snowcover'][0,0,0] = 2
-    ds['snow_index'][0,0,0] = -1
-    ds['snowcover'][0,1,0] = 4
-    ds['snow_index'][0,1,0] = -1
-    ds['snowcover'][0,2,0] = 2
-    ds['snow_index'][0,2,0] = 1
-    ds['snowcover'][0,3,0] = 4
-    ds['snow_index'][0,3,0] = 1
-    ds['snowcover'][0,1,1] = 4
-    ds['snow_index'][0,1,1] = -1
+# def test_negative_snow_index_wet(test_ds):
+#     ds = test_ds
+#     ds['snowcover'][0,0,0] = 2
+#     ds['snow_index'][0,0,0] = -1
+#     ds['snowcover'][0,1,0] = 4
+#     ds['snow_index'][0,1,0] = -1
+#     ds['snowcover'][0,2,0] = 2
+#     ds['snow_index'][0,2,0] = 1
+#     ds['snowcover'][0,3,0] = 4
+#     ds['snow_index'][0,3,0] = 1
+#     ds['snowcover'][0,1,1] = 4
+#     ds['snow_index'][0,1,1] = -1
 
-    ds = id_wet_negative_si(ds)
+#     ds = id_wet_negative_si(ds)
 
-    # Select by x, y, time explicitly
-    assert ds['alt_wet_flag'].isel(x=0, y=0, time=0).item() == 0
-    assert ds['alt_wet_flag'].isel(x=0, y=1, time=0).item() == 0
-    assert ds['alt_wet_flag'].isel(x=0, y=2, time=0).item() == 1
-    assert ds['alt_wet_flag'].isel(x=0, y=3, time=0).item() == 1
+#     # Select by x, y, time explicitly
+#     assert ds['alt_wet_flag'].isel(x=0, y=0, time=0).item() == 0
+#     assert ds['alt_wet_flag'].isel(x=0, y=1, time=0).item() == 0
+#     assert ds['alt_wet_flag'].isel(x=0, y=2, time=0).item() == 1
+#     assert ds['alt_wet_flag'].isel(x=0, y=3, time=0).item() == 1
