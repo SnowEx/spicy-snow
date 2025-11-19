@@ -38,11 +38,9 @@ try:
 except FileNotFoundError:
     long_description = DESCRIPTION
 
-VERSION = "{{VERSION_PLACEHOLDER}}"  # placeholder for GitHub tag workflow
+import os
 
-# fallback for local/CI installs
-if VERSION == "{{VERSION_PLACEHOLDER}}":
-    VERSION = "0.3.0.dev0"
+VERSION = os.getenv("SPICY_SNOW_VERSION", "0.0.0.dev0")
 
 setup(
     name=NAME,
