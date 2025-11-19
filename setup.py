@@ -13,12 +13,12 @@ AUTHOR = 'Zach Hoppinen'
 REQUIRES_PYTHON = '>=3.9,<3.12'
 
 REQUIRED = [
-    # 'numpy',
-    # 'pandas',
-    # 'xarray',
+    'numpy',
+    'pandas',
+    'xarray',
     'geopandas',
     'rioxarray',
-    # 'shapely',
+    'shapely',
     'asf_search',
     'earthaccess',
     'matplotlib',
