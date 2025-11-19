@@ -10,43 +10,43 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout
+
       - name: Checkout source
         uses: actions/checkout@v3
-
+  
       # 2. Extract tag name
       - name: Extract tag
         run: echo "SPICY_SNOW_VERSION=${GITHUB_REF##*/}" >> $GITHUB_ENV
-
+  
       # 3. Setup Python
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: "3.10"
-
+  
       # 4. Install build tools
       - name: Install build tools
         run: |
           python -m pip install --upgrade pip
           pip install build twine
-
+  
       # 5. Build
       - name: Build distributions
         run: python -m build
         env:
           SPICY_SNOW_VERSION: ${{ env.SPICY_SNOW_VERSION }}
-
+  
       # 6. Check with Twine
       - name: Twine check
         run: twine check dist/*
-
+  
       # 7. Publish to PyPI
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           user: __token__
           password: ${{ secrets.PYPI_API_TOKEN }}
-
+  
       # 8. Create GitHub Release
       - name: Create GitHub Release
         id: create_release
@@ -56,7 +56,7 @@ jobs:
         with:
           tag_name: ${{ env.SPICY_SNOW_VERSION }}
           release_name: ${{ env.SPICY_SNOW_VERSION }}
-
+  
       # 9. Upload all artifacts to Release
       - name: Upload distributions
         run: |
