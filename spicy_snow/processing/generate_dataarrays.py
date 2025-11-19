@@ -311,7 +311,7 @@ def get_nlcd(aoi):
     fcf_da = gh.nlcd_bygeom(geometry = g)[0]['canopy_2021']
 
     if isinstance(aoi, Point):
-        fcf_da = da_to_2d_array(fcf_da, aoi.y, aoi.x, fcf_da.crs, fcf_da.rio.transform())
+        fcf_da = sel_1point_da_to_2d_array(fcf_da, aoi.y, aoi.x, fcf_da.crs, fcf_da.rio.transform())
 
     return fcf_da
 
