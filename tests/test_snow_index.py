@@ -2,6 +2,8 @@ import pytest
 import numpy as np
 import pandas as pd
 import xarray as xr
+from numpy.testing import assert_allclose
+
 from spicy_snow.processing.snow_index import (
     calc_delta_vv,
     calc_delta_cross_ratio,
@@ -12,7 +14,6 @@ from spicy_snow.processing.snow_index import (
     calc_snow_index,
     calc_snow_index_to_snow_depth,
 )
-from numpy.testing import assert_allclose
 
 # Minimal fixture for testing
 @pytest.fixture

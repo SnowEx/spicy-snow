@@ -12,7 +12,7 @@ from spicy_snow.processing.s1_preprocessing import (
     merge_s1_subsets,
     amplitude_to_dB
 )
-from spicy_constants import s1_dual_pols
+from spicy_snow.spicy_constants import s1_dual_pols
 
 
 # -----------------------------
