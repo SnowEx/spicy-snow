@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [tool.poetry]
 name = "spicy-snow"
-version = "0.2.1"
+version = "0.3.0"
 description = "Use Sentinel-1 volumetric scattering at C-band to retrieve snow depths."
 authors = ["Zachary Hoppinen <zachhoppinen@gmail.com>"]
 license = "MIT"
@@ -35,7 +35,7 @@ isort = "*"
 flake8 = "*"
 
 [tool.bumpversion]
-current_version = "0.2.1"
+current_version = "0.3.0"
 commit = true
 tag = true
 tag_name = "v{new_version}"

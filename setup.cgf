@@ -1,6 +1,6 @@
 [metadata]
 name = spicy-snow
-version = 0.2.1
+version = 0.3.0
 description = Use Sentinel-1 volumetric scattering at C-band to retrieve snow depths.
 long_description = file: README.md
 long_description_content_type = text/markdown
