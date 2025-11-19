@@ -1,6 +1,5 @@
 name: Publish spicy-snow to PyPI & GitHub
 
-# Trigger only on tag pushes
 on:
   push:
     tags:
@@ -9,71 +8,60 @@ on:
 jobs:
   build-and-publish:
     runs-on: ubuntu-latest
-    name: Build & Publish
 
     steps:
-      # 1️⃣ Checkout the repo
+      # 1. Checkout
       - name: Checkout source
         uses: actions/checkout@v3
 
-      # 2️⃣ Set up Python
+      # 2. Extract tag name
+      - name: Extract tag
+      run: echo "SPICY_SNOW_VERSION=${GITHUB_REF##*/}" >> $GITHUB_ENV
+
+      # 3. Setup Python
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: "3.10"
 
-      # 3️⃣ Install build tools
-      - name: Install build dependencies
+      # 4. Install build tools
+      - name: Install build tools
         run: |
           python -m pip install --upgrade pip
           pip install build twine
 
-      # 4️⃣ Extract tag name for version
-      - name: Extract tag
-        id: tag
-        run: echo "TAG_NAME=$(echo $GITHUB_REF | cut -d / -f 3)" >> $GITHUB_ENV
-
-      # 5️⃣ Update setup.py version
-      - name: Update version in setup.py
-        run: sed -i "s/{{VERSION_PLACEHOLDER}}/${TAG_NAME}/g" setup.py
-        env:
-          TAG_NAME: ${{ env.TAG_NAME }}
-
-      # 6️⃣ Build distributions
+      # 5. Build
       - name: Build distributions
         run: python -m build
+        env:
+          SPICY_SNOW_VERSION: ${{ env.SPICY_SNOW_VERSION }}
 
-      # 7️⃣ Check built distributions
+      # 6. Check with Twine
       - name: Twine check
         run: twine check dist/*
 
-      # 8️⃣ Publish to PyPI
+      # 7. Publish to PyPI
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           user: __token__
           password: ${{ secrets.PYPI_API_TOKEN }}
 
-      # 9️⃣ Create GitHub release
-      - name: Create GitHub release
+      # 8. Create GitHub Release
+      - name: Create GitHub Release
         id: create_release
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ env.TAG_NAME }}
-          release_name: ${{ env.TAG_NAME }}
-          draft: false
-          prerelease: false
-          
-      # 🔟 Upload distributions to GitHub release
+          tag_name: ${{ env.SPICY_SNOW_VERSION }}
+          release_name: ${{ env.SPICY_SNOW_VERSION }}
+
+      # 9. Upload all artifacts to Release
       - name: Upload distributions
         run: |
-          echo "Found dist files:"
-          ls dist/
           for file in dist/*; do
-            echo "Uploading $file"
-            gh release upload ${{ env.TAG_NAME }} "$file"
+            gh release upload ${{ env.SPICY_SNOW_VERSION }} "$file"
           done
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
