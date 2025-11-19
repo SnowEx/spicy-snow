@@ -24,7 +24,8 @@ REQUIRED = [
     'netcdf4',
     'h5py',
     'pygeohydro',
-    'zarr'
+    'zarr',
+    'dask'
 ]
 
 here = os.path.abspath(os.path.dirname(__file__))
