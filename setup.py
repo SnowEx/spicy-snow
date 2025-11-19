@@ -33,7 +33,7 @@ URL = 'https://github.com/SnowEx/spicy-snow'
 EMAIL = 'zachhoppinen@gmail.com'
 AUTHOR = 'Zach Hoppinen'
 REQUIRES_PYTHON = '>=3.9.0'
-VERSION = '0.2.1'
+VERSION = '0.3.0'
 
 # What packages are required for this module to be executed?
 REQUIRED = [
@@ -118,7 +118,7 @@ class UploadCommand(Command):
 # Where the magic happens:
 setup(
     name=NAME,
-    version='0.2.1', # change to value if not using github auto upload
+    version='0.3.0', # change to value if not using github auto upload
     description=DESCRIPTION,
     long_description=long_description,
     long_description_content_type='text/markdown',
