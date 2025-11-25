@@ -16,17 +16,15 @@ from os.path import expanduser
 sys.path.append(expanduser('../'))
 
 # import functions for downloading
-from spicy_snow.download.sentinel1 import s1_img_search, hyp3_pipeline, download_hyp3, combine_s1_images
-from spicy_snow.download.forest_cover import download_fcf
-from spicy_snow.download.snow_cover import download_snow_cover
+from spicy_snow.find_data import get_sentinel1_urls, find_snowcover_urls
+from spicy_snow.processing.generate_dataarrays import generate_sentinel1_dataarray,\
+    generate_snowcover_dataarray, generate_forest_fraction_dataarray, convert_snowcover_dates_to_s1_overpasses
 
 # import functions for pre-processing
-from spicy_snow.processing.s1_preprocessing import merge_partial_s1_images, s1_orbit_averaging,\
-s1_clip_outliers, subset_s1_images, ims_water_mask, s1_incidence_angle_masking, merge_s1_subsets, \
-add_confidence_angle
+from spicy_snow.processing.s1_preprocessing import s1_orbit_averaging, s1_clip_outliers, ims_water_mask, amplitude_to_dB
 
 # import the functions for snow_index calculation
-from spicy_snow.processing.snow_index import calc_delta_VV, calc_delta_cross_ratio, \
+from spicy_snow.processing.snow_index import calc_delta_vv, calc_delta_cross_ratio, \
     calc_delta_gamma, clip_delta_gamma_outlier, calc_snow_index, calc_snow_index_to_snow_depth
 
 # import the functions for wet snow flag
@@ -35,29 +33,30 @@ from spicy_snow.processing.wet_snow import id_newly_frozen_snow, id_newly_wet_sn
 
 # setup root logger
 from spicy_snow.utils.spicy_logging import setup_logging
+from spicy_snow.utils.checks import validate_aoi, validate_dates
+from spicy_snow.utils.download import download_urls, download_urls_parallel
 
-def retrieve_snow_depth(area: shapely.geometry.Polygon, 
+def retrieve_snow_depth(aoi: shapely.geometry.Polygon, 
                         dates: Tuple[str, str], 
                         work_dir: str = './',
-                        job_name: str = 'spicy-snow-run',
-                        existing_job_name: Union[bool, str] = False,
+                        work_stem = None,
+                        resolution = 100,
                         debug: bool = False,
                         ims_masking: bool = True,
                         wet_snow_thresh: float = -2,
                         freezing_snow_thresh: float = 1,
                         wet_SI_thresh: float = 0,
-                        outfp: Union[str, Path, bool] = False,
+                        outfp: Union[str, Path, None] = None,
                         params: List[float] = [2.5, 0.2, 0.55]) -> xr.Dataset:
     """
     Finds, downloads Sentinel-1, forest cover, water mask (not implemented), and 
     snow coverage. Then retrieves snow depth using Lievens et al. 2021 method.
 
     Args:
-    area: Shapely geometry to use as bounding box of desired area to search within
+    aoi: Shapely bounding box or [xmin, ymin, xmax, ymax] iterable of desired area to search within
     dates: Start and end date to search between
     work_dir: filepath to directory to work in. Will be created if not existing
-    job_name: name for hyp3 job
-    existing_job_name: name for preexisiting hyp3 job to download and avoid resubmitting
+    job_name: [Optional] Name for project file stems otherwise generated from dates
     debug: do you want to get verbose logging?
     ims_masking: do you want to mask pixels by IMS snow free imagery?
     wet_snow_thresh: what threshold in dB change to use for melting and re-freezing snow? Default: -2
@@ -71,91 +70,102 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
     image acquistions in area and dates
     """
 
-    ## argument checking
-    assert isinstance(area, shapely.geometry.Polygon), f"Must provide shapely geometry for area. Got {type(area)}"
+    # -- preflight checks -- #
+    aoi = validate_aoi(aoi)
+    dates = validate_dates(*dates)
 
-    assert isinstance(dates, list) or isinstance(dates, tuple)
-    assert len(dates) == 2, f"Can only provide two dates to work between. Got {dates}"
-
-    assert isinstance(work_dir, str) or isinstance(work_dir, Path)
-    if isinstance(work_dir, Path):
-        work_dir = str(work_dir)
-    
     assert isinstance(debug, bool), f"Debug keyword must be boolean. Got {debug}"
-
     assert isinstance(params, list) or isinstance(params, tuple), f"param keyword must be list or tuple. Got {type(params)}"
     assert len(params) == 3, f"List of params must be 3 in order A, B, C. Got {params}"
     A, B, C = params
 
-    if type(outfp) != bool:
+    assert wet_snow_thresh < 0, f"Wet snow threshold set at {wet_snow_thresh}. This value is positive but should be negative."
+    assert freezing_snow_thresh > 0, f"Refreeze threshold set at {freezing_snow_thresh}. This value is negative but should be positive."
+
+    if outfp is not None:
         outfp = Path(outfp).expanduser().resolve()
         assert outfp.parent.exists(), f"Out filepath {outfp}'s directory does not exist"
 
-    ## set up directories and logging
-
+    # -- Setting up directories and logging -- #
+    work_dir = Path(work_dir)
     os.makedirs(work_dir, exist_ok = True)
 
     setup_logging(log_dir = join(work_dir, 'logs'), debug = debug)
     log = logging.getLogger(__name__)
 
-    if wet_snow_thresh >= 0:
-        log.warning(f"Running with wet snow threshold of {wet_snow_thresh}. This value is positive but should be negative.")
+    # get main stem for automated file naming
+    work_stem = f'{pd.to_datetime(dates[0]).date()}_{pd.to_datetime(dates[1]).date()}' if work_dir is not None else work_stem
     
-    if freezing_snow_thresh <= 0:
-        log.warning(f"Running with refreeze threshold of {freezing_snow_thresh}. This value is negative but should be positive.")
+    # -- Downloading S1, FCF, Snowcover -- #
+
+    # start with Sentinel-1 #
+    log.info("Downloading sentinel-1 gamma0 backscatter data")
+
+    # get sentinel 1 data search results
+    s1_urls = get_sentinel1_urls(start_date = dates[0], stop_date = dates[1], aoi = aoi)
+    # Keep only necessary downloads vv, vh, mask.
+    s1_urls = [u for u in s1_urls if u.endswith(('_VV.tif', '_VH.tif', '_mask.tif'))]
+    # download sentinel urls
+    s1_fps = download_urls_parallel(s1_urls, work_dir.joinpath('opera'))
+
+    # generate dataset and start to save s1 data vars. Use zarr to reduce memory load for big arrays
+    ds = xr.Dataset()
+    ds['vv'] = generate_sentinel1_dataarray(s1_fps, aoi, pol = 'VV', resolution = resolution)
+
+    # grab spatial reference from first time step of VV
+    spatial_reference = ds['vv'].isel(time = 0)
+
+    # repeat combining and spatial resampling for VH
+    ds['vh'] = generate_sentinel1_dataarray(s1_fps, aoi, pol = 'VH', ref = spatial_reference)
     
-    ## Downloading Steps
+    # next VIIRS snowcover #
+    log.info("Downloading VIIRS snowcover data")
 
-    # get asf_search search results
-    search_results = s1_img_search(area, dates)
-    log.info(f'Found {len(search_results)} results')
+    # download viirs snow cover fraction for each sentinel 1 overpass date
+    snowcover_urls = find_snowcover_urls(start_date = dates[0], stop_date = dates[1], date_list = ds.time.dt.date, aoi = aoi)
+    snowcover_fps = download_urls_parallel(snowcover_urls, work_dir.joinpath('snowcover'))
 
-    assert len(search_results) > 3, f"Need at least 4 images to run. Found {len(search_results)} \
-    using area: {area} and dates: {dates}."
+    # generate snow cover dataset
+    viirs_snowcover = generate_snowcover_dataarray(snowcover_fps, ref = spatial_reference)
 
-    # download s1 images into dataset ['s1'] variable name
-    jobs = hyp3_pipeline(search_results, job_name = job_name, existing_job_name = existing_job_name)
-    imgs = download_hyp3(jobs, area, outdir = join(work_dir, 'tmp'), clean = False)
-    ds = combine_s1_images(imgs)
+    # resample date times from each day to the exact s1 overpass time. Doubles if two in one day
+    viirs_snowcover = convert_snowcover_dates_to_s1_overpasses(viirs_snowcover, ds['vv'])
 
-    # merge partial images together
-    ds = merge_partial_s1_images(ds)
-
-    # download IMS snow cover and add to dataset ['ims'] keyword
-    ds = download_snow_cover(ds, tmp_dir = join(work_dir, 'tmp'), clean = False)
-
+    # grab out watermask information and snowcover data
+    # table 1 https://nsidc.org/sites/default/files/documents/user-guide/multi_vnp10a1f-v002-userguide.pdf
+    ds['watermask'] = (viirs_snowcover == 237).median('time')
+    # set pixels with over 10% snow cover to snowcovered
+    ds['snowcover'] = (viirs_snowcover.where(viirs_snowcover <= 100) > 10).astype(int)
+    
+    # finally NLCD or Proba-V forest cover fraction #
+    log.info("Downloading forest cover fraction data")
     # download fcf and add to dataset ['fcf'] keyword
-    ds = download_fcf(ds, join(work_dir, 'tmp', 'fcf.tif'))
+    # this will us NLCD for within US (very fast) or Proba-v for global (very slow)
+    ds['fcf'] = generate_forest_fraction_dataarray(aoi, ref = spatial_reference)
 
-    ## Preprocessing Steps
+    # -- Preprocessing Sentinel-1 backscatter -- #
     log.info("Preprocessing Sentinel-1 images")
 
-    #TODO add water mask
-    # ds = ims_water_mask(ds)
+    # water mask dataset
+    ds = ims_water_mask(ds)
 
     # mask out outliers in incidence angle
-    ds = s1_incidence_angle_masking(ds)
+    # no longer used. Using opera's included shadow and layover mask generate_dataset
+    # ds = s1_incidence_angle_masking(ds)
     
-    # subset dataset by flight_dir and platform
-    dict_ds = subset_s1_images(ds)
-
-    for subset_name, subset_ds in dict_ds.items():
-        # average each orbit to overall mean
-        dict_ds[subset_name] = s1_orbit_averaging(subset_ds)
-        # clip outlier values of backscatter to overall mean
-        dict_ds[subset_name] = s1_clip_outliers(subset_ds)
+    # convert from gamma0 amplitude to dB
+    ds = amplitude_to_dB(ds)
     
-    # recombine subsets
-    ds = merge_s1_subsets(dict_ds)
+    # average orbits backscatter to same means
+    ds = s1_orbit_averaging(ds)
+    # clip outlier values of backscatter to overall mean
+    ds = s1_clip_outliers(ds)
 
-    # calculate confidence interval
-    ds = add_confidence_angle(ds)
-
-    ## Snow Index Steps
+    # -- Calulating Snow Index -- #
     log.info("Calculating snow index")
     # calculate delta CR and delta VV
     ds = calc_delta_cross_ratio(ds, A = A)
-    ds = calc_delta_VV(ds)
+    ds = calc_delta_vv(ds)
 
     # calculate delta gamma with delta CR and delta VV with FCF
     ds = calc_delta_gamma(ds, B = B)
@@ -185,9 +195,10 @@ def retrieve_snow_depth(area: shapely.geometry.Polygon,
     ds.attrs['param_B'] = B
     ds.attrs['param_C'] = C
 
-    ds.attrs['job_name'] = job_name
+    ds.attrs['bounds'] = aoi.bounds
 
-    ds.attrs['bounds'] = area.bounds
+    # set dimensions in rioxarray order
+    ds = ds.transpose("time", "y", "x")
 
     if outfp:
         outfp = str(outfp)

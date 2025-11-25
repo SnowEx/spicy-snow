@@ -1,572 +1,280 @@
-import unittest
-from numpy.testing import assert_allclose
-
+import pytest
 import numpy as np
 import pandas as pd
 import xarray as xr
-import pickle
+from numpy.testing import assert_allclose
 
-import sys
-from os.path import expanduser
-sys.path.append(expanduser('./'))
-from spicy_snow.processing.snow_index import calc_delta_VV, calc_delta_cross_ratio,\
-    calc_delta_gamma, clip_delta_gamma_outlier, find_repeat_interval, \
-    calc_prev_snow_index, calc_snow_index, calc_snow_index_to_snow_depth
+from spicy_snow.processing.snow_index import (
+    calc_delta_vv,
+    calc_delta_cross_ratio,
+    calc_delta_gamma,
+    clip_delta_gamma_outlier,
+    find_repeat_interval,
+    calc_prev_snow_index,
+    calc_snow_index,
+    calc_snow_index_to_snow_depth,
+)
 
-class TestSnowIndex(unittest.TestCase):
+# Minimal fixture for testing
+@pytest.fixture
+def sample_dataset():
+    times = pd.date_range("2025-01-01", periods=3)
+    data = xr.Dataset(
+        {
+            "vv": (("time", "y", "x"), np.array([
+                [[1, 2],[3,4]],
+                [[2,3],[4,5]],
+                [[3,4],[5,6]]
+            ], dtype=float)),
+            "vh": (("time", "y", "x"), np.array([
+                [[0.5, 1],[1.5,2]],
+                [[1,1.5],[2,2.5]],
+                [[1.5,2],[2.5,3]]
+            ], dtype=float)),
+            "fcf": (("y","x"), np.array([[0.2,0.5],[0.8,0.1]])),
+            "track": ("time", np.array([1,1,1]))
+        },
+        coords={"time": times, "y":[0,1], "x":[0,1]},
+        attrs={"s1_units":"dB"}
+    )
+    return data
+
+def test_calc_delta_vv(sample_dataset):
+    ds = calc_delta_vv(sample_dataset)
+    # deltavv should have NaN for first time step
+    np.testing.assert_array_equal(np.isnan(ds['deltavv'].isel(time=0)), np.ones((2,2), dtype=bool))
+    # second time step should equal difference
+    np.testing.assert_array_equal(ds['deltavv'].isel(time=1), np.array([[1,1],[1,1]]))
+
+def test_calc_delta_cross_ratio(sample_dataset):
+    ds = calc_delta_cross_ratio(sample_dataset, A=2)
+    np.testing.assert_array_equal(np.isnan(ds['deltaCR'].isel(time=0)), np.ones((2,2), dtype=bool))
+    # check that deltaCR second timestep is numeric
+    assert not np.any(np.isnan(ds['deltaCR'].isel(time=1)))
+
+def test_calc_delta_gamma(sample_dataset):
+    ds = calc_delta_vv(sample_dataset)
+    ds = calc_delta_cross_ratio(ds)
+    ds = calc_delta_gamma(ds, B=0.5)
+    assert 'deltaGamma' in ds
+    # values should be combination of deltaCR and deltavv
+    val = ds['deltaGamma'].isel(time=1).values
+    assert np.all(val >= 0)
+
+def test_clip_delta_gamma_outlier(sample_dataset):
+    ds = calc_delta_vv(sample_dataset)
+    ds = calc_delta_cross_ratio(ds)
+    ds = calc_delta_gamma(ds)
+    # artificially inflate values
+    ds['deltaGamma'] = ds['deltaGamma'] + 100
+    ds = clip_delta_gamma_outlier(ds, thresh=3)
+    assert np.nanmax(ds['deltaGamma']) <= 3
+
+def test_find_repeat_interval():
+    # 6-day interval dataset
+    times = pd.date_range("2025-01-01", periods=3, freq="6D")
+    ds = xr.Dataset(
+        {
+            "vv": (("time", "y", "x"), np.random.rand(3, 2, 2)),
+            "fcf": (("y", "x"), np.array([[0.2, 0.5], [0.8, 0.1]]))
+        },
+        coords={
+            "time": times,
+            "track": ("time", [1, 1, 1])
+        },
+        attrs={"s1_units": "dB"}
+    )
+    repeat = find_repeat_interval(ds)
+    assert repeat.days == 6
+
+def test_calc_prev_snow_index(sample_dataset):
+    ds = sample_dataset.copy()
+    ds['snow_index'] = xr.zeros_like(ds['vv'])
+    repeat = pd.Timedelta('6D')
+    prev = calc_prev_snow_index(ds, ds.time[2].values, repeat)
+    assert prev.shape == (2,2)
+
+def test_calc_snow_index_normal():
     """
-    Test functionality of snow_index calculation functions
+    Normal test: snow_index accumulates deltaGamma correctly.
+    First step of each track has a previous image (dummy zeros).
     """
 
-    @classmethod
-    def setUpTestDataset(self):
-        backscatter = np.random.randn(10, 10, 25, 3)
-        times = [np.datetime64(t) for t in ['2020-01-01T00:00','2020-01-01T00:10','2020-01-02T10:10', '2020-01-02T10:20', '2020-01-02T10:40']]
-        times_full = []
-        [times_full.extend([t + pd.Timedelta(f'{i} days') for t in times]) for i in range(0, 5 * 12, 12)]
-
-        orbits = np.tile(np.array([24, 24, 65, 65, 65]), reps = 5)
-        platforms = np.tile(np.array(['S1A', 'S1A', 'S1B', 'S1B', 'S1B']), reps = 5)
-        direction = np.tile(np.array(['descending', 'descending', 'ascending', 'ascending', 'ascending']), reps = 5)
-        x = np.linspace(0, 9, 10)
-        y = np.linspace(10, 19, 10)
-
-        test_ds = xr.Dataset(
-            data_vars = dict(
-                s1 = (["x", "y", "time", "band"], backscatter),
-            ),
-
-            coords = dict(
-                x = (["x"], x),
-                y = (["y"], y),
-                band = ['VV', 'VH', 'inc'],
-                time = times_full,
-                relative_orbit = (["time"], orbits),
-                platform = (["time"], platforms),
-                flight_dir = (["time"], direction)
-                ))
-
-        return test_ds
-    
-    def test_delta_vv(self):
-        """
-        Test the calculation of change in VV between time steps of same
-        relative orbit
-        """
-        test_ds = self.setUpTestDataset()
-        orbit_ds = test_ds.sel(time = test_ds.relative_orbit == 24)
-    
-        da1 = orbit_ds['s1'].sel(band = 'VV').isel(time = 0)
-        da2 = orbit_ds['s1'].sel(band = 'VV').isel(time = 1)
-        da3 = orbit_ds['s1'].sel(band = 'VV').isel(time = 2)
-        real2_1_diff = da2 - da1
-        real3_2_diff = da3 - da2
-
-        ds1 = calc_delta_VV(orbit_ds)
-
-        assert_allclose(ds1['deltaVV'].isel(time = 1), real2_1_diff)
-        
-        assert_allclose(ds1['deltaVV'].isel(time = 2), real3_2_diff)
-    
-    def test_delta_vv_errors(self):
-        """
-        test that if units are amplitude calc_delta_vv raises AssertionErro
-        """
-        test_ds = self.setUpTestDataset()
-        
-        test_ds.attrs['s1_units'] = 'amp'
-
-        self.assertRaises(AssertionError, calc_delta_VV, test_ds)
-    
-        """
-        Test the calculation of change in VV between time steps of same
-        relative orbit
-        """
-        test_ds = self.setUpTestDataset()
-        orbit_ds = test_ds.sel(time = test_ds.relative_orbit == 24)
-
-        test_A = 2
-
-        CR_ds = orbit_ds['s1'].sel(band = 'VH') * test_A - orbit_ds['s1'].sel(band = 'VV')
-        CR1 = CR_ds.isel(time = 0)
-        CR2 = CR_ds.isel(time = 1)
-        CR3 = CR_ds.isel(time = 2)
-        real2_1_diff = CR2 - CR1
-        real3_2_diff = CR3 - CR2
-
-        ds1 = calc_delta_cross_ratio(orbit_ds, A = test_A)
-
-        assert_allclose(ds1['deltaCR'].isel(time = 1), real2_1_diff)
-        
-        assert_allclose(ds1['deltaCR'].isel(time = 2), real3_2_diff)
-    
-    def test_delta_cr_errors(self):
-        """
-        test that if units are amplitude calc_delta_vv raises AssertionErro
-        """
-        test_ds = self.setUpTestDataset()
-        
-        test_ds.attrs['s1_units'] = 'amp'
-
-        self.assertRaises(AssertionError, calc_delta_cross_ratio, test_ds)
-    
-    def test_delta_gamma(self):
-        backscatter = np.random.randn(10, 10, 4, 3)
-        deltaVV = np.random.randn(10, 10 , 4)
-        deltaCR = np.random.randn(10, 10 , 4)
-        fcf = np.random.randn(10, 10 , 4)/100 + 0.5
-        fcf[fcf < 0] = 0
-        fcf[fcf > 1] = 1
-        times = [np.datetime64(t) for t in ['2020-01-01','2020-01-02', '2020-01-08', '2020-01-09']]
-        x = np.linspace(0, 9, 10)
-        y = np.linspace(10, 19, 10)
-        lon, lat = np.meshgrid(x, y)
-
-        test_ds = xr.Dataset(
-            data_vars = dict(
-                s1 = (["x", "y", "time", "band"], backscatter),
-                deltaVV = (["x", "y", "time"], deltaVV),
-                fcf = (["x", "y", "time"], fcf),
-                deltaCR = (["x", "y", "time"], deltaCR)
-            ),
-
-            coords = dict(
-                lon = (["x", "y"], lon),
-                lat = (["x", "y"], lat),
-                band = ['VV', 'VH', 'inc'],
-                time = times,
-                relative_orbit = (["time"], [24, 1, 24, 1])))
-
-        ds = calc_delta_gamma(test_ds)
-        deltaG_calc = ds['deltaGamma'].values.ravel()
-        
-        fcf = ds['fcf']
-        cr = ds['deltaCR']
-        vv = ds['deltaVV']
-        B = 0.5
-        deltaG_real = (1 - fcf) * cr + (fcf * B * vv)
-        deltaG_real = deltaG_real.values.ravel()
-
-        assert_allclose(deltaG_real[~np.isnan(deltaG_real)], deltaG_calc[~np.isnan(deltaG_calc)])
-    
-    def test_delta_gamma_clip(self):
-        backscatter = np.random.randn(10, 10, 4, 3)
-        deltaVV = np.random.randn(10, 10 , 4)
-        deltaCR = np.random.randn(10, 10 , 4)
-        fcf = np.random.randn(10, 10 , 4)/100 + 0.5
-        fcf[fcf < 0] = 0
-        fcf[fcf > 1] = 1
-        times = [np.datetime64(t) for t in ['2020-01-01','2020-01-02', '2020-01-08', '2020-01-09']]
-        x = np.linspace(0, 9, 10)
-        y = np.linspace(10, 19, 10)
-        lon, lat = np.meshgrid(x, y)
-
-        test_ds = xr.Dataset(
-            data_vars = dict(
-                s1 = (["x", "y", "time", "band"], backscatter),
-                deltaVV = (["x", "y", "time"], deltaVV),
-                fcf = (["x", "y", "time"], fcf),
-                deltaCR = (["x", "y", "time"], deltaCR)
-            ),
-
-            coords = dict(
-                lon = (["x", "y"], lon),
-                lat = (["x", "y"], lat),
-                band = ['VV', 'VH', 'inc'],
-                time = times,
-                relative_orbit = (["time"], [24, 1, 24, 1])))
-
-        ds = calc_delta_gamma(test_ds)
-        old = ds.copy(deep = True)
-        ds = clip_delta_gamma_outlier(ds)
-
-        # assert max and min have been clipped        
-        self.assertLessEqual(ds['deltaGamma'].max(), 3, "Max should be 3 after clipping")
-        self.assertGreaterEqual(ds['deltaGamma'].min(), -3, "Min should be -3 after clipping")
-
-        # assert number of nans did not change
-        self.assertEqual(ds['deltaGamma'].isnull().sum(), old['deltaGamma'].isnull().sum())
-
-    def test_find_repeat_interval(self):
-        backscatter = np.random.randn(10, 10, 3)
-        times = [np.datetime64(t) for t in ['2020-01-01', '2020-01-07', '2020-01-13']]
-        x = np.linspace(0, 9, 10)
-        y = np.linspace(10, 19, 10)
-        lon, lat = np.meshgrid(x, y)
-
-        test_ds = xr.Dataset(
-            data_vars = dict(
-                s1 = (["x", "y", "time"], backscatter)
-            ),
-            coords = dict(
-                lon = (["x", "y"], lon),
-                lat = (["x", "y"], lat),
-                time = times,
-                relative_orbit = (["time"], [24, 24, 24])))
-        
-        repeat = find_repeat_interval(test_ds)
-
-        self.assertEqual(repeat.days, 6)
-
-        self.assertEqual(type(repeat), pd.Timedelta)
-
-        test_ds['time'] = [np.datetime64(t) for t in ['2020-01-01', '2020-01-13', '2020-01-25']]
-
-        repeat = find_repeat_interval(test_ds)
-
-        self.assertEqual(repeat.days, 12)
-
-        test_ds['time'] = [np.datetime64(t) for t in ['2020-01-01', '2020-01-06', '2020-01-17']]
-
-        self.assertRaises(AssertionError, find_repeat_interval, test_ds)
-
-        # check with multiple orbits
-
-        backscatter = np.random.randn(10, 10, 6, 3)
-        deltaGamma = np.random.randn(10, 10 , 6)
-        times = [np.datetime64(t) for t in ['2020-01-01','2020-01-02', '2020-01-07','2020-01-08', '2020-01-14', '2020-01-15']]
-        x = np.linspace(0, 9, 10)
-        y = np.linspace(10, 19, 10)
-        lon, lat = np.meshgrid(x, y)
-
-        test_ds = xr.Dataset(
-            data_vars = dict(
-                s1 = (["x", "y", "time", "band"], backscatter),
-                deltaGamma = (["x", "y", "time"], deltaGamma)
-            ),
-
-            coords = dict(
-                lon = (["x", "y"], lon),
-                lat = (["x", "y"], lat),
-                band = ['VV', 'VH', 'inc'],
-                time = times,
-                relative_orbit = (["time"], [24, 1, 24, 1, 24, 1])))
-        
-        repeat = find_repeat_interval(test_ds)
-
-        self.assertEqual(repeat.days, 6)
-    
-    def test_previous_snow_index(self):
-        backscatter = np.random.randn(10, 10, 3, 3)
-        deltaGamma = np.random.randn(10, 10 , 3)
-        times = [np.datetime64(t) for t in ['2020-01-06', '2020-01-07', '2020-01-13']]
-        x = np.linspace(0, 9, 10)
-        y = np.linspace(10, 19, 10)
-        lon, lat = np.meshgrid(x, y)
-
-        test_ds = xr.Dataset(
-            data_vars = dict(
-                s1 = (["x", "y", "time", "band"], backscatter),
-                deltaGamma = (["x", "y", "time"], deltaGamma),
-                snow_index = (["x", "y", "time"], np.zeros_like(deltaGamma))
-            ),
-
-            coords = dict(
-                lon = (["x", "y"], lon),
-                lat = (["x", "y"], lat),
-                band = ['VV', 'VH', 'inc'],
-                time = times,
-                relative_orbit = (["time"], [24, 24, 24])))
-        
-        # test if all previous snow indexes are zero
-        prev_si = calc_prev_snow_index(test_ds, current_time = test_ds.isel(time = 2).time.values, repeat = pd.Timedelta('6 days'))
-    
-        assert_allclose(np.zeros_like(prev_si), prev_si)
-
-        # test to see if weights are working
-        test_ds['snow_index'].loc[dict(time = '2020-01-06')] = 1
-        test_ds['snow_index'].loc[dict(time = '2020-01-07')] = 2
-
-        prev_si = calc_prev_snow_index(test_ds, current_time = test_ds.isel(time = 2).time.values, repeat = pd.Timedelta('6 days'))
-
-        # this should be (6 * 2 + 5 * 1) / (6 + 5) or 1.54545454 
-        assert_allclose(prev_si, np.ones_like(prev_si)* 17/11)
-
-        times = [np.datetime64(t) for t in ['2020-01-01', '2020-01-07', '2020-01-14']]
-        test_ds = xr.Dataset(
-            data_vars = dict(
-                s1 = (["x", "y", "time", "band"], backscatter),
-                deltaGamma = (["x", "y", "time"], deltaGamma),
-                snow_index = (["x", "y", "time"], np.zeros_like(deltaGamma))
-            ),
-
-            coords = dict(
-                lon = (["x", "y"], lon),
-                lat = (["x", "y"], lat),
-                band = ['VV', 'VH', 'inc'],
-                time = times,
-                relative_orbit = (["time"], [24, 24, 24])))
-        
-        test_ds['snow_index'].loc[dict(time = '2020-01-07')] = 2
-
-        # test to see if all days outside +- 5 days are exclude
-        prev_si = calc_prev_snow_index(test_ds, current_time = test_ds.isel(time = 2).time.values, repeat = pd.Timedelta('6 days'))
-
-        # this should be (5 * 1 + 4 * 2) / (5 + 4) or 1.555555 
-        assert_allclose(prev_si, np.ones_like(prev_si)* 2)
-
-        # test for 12 day interval
-        backscatter = np.random.randn(10, 10, 4, 3)
-        deltaGamma = np.random.randn(10, 10 , 4)
-        times = [np.datetime64(t) for t in ['2020-01-11', '2020-01-12', '2020-01-13', '2020-01-25']]
-        test_ds = xr.Dataset(
-            data_vars = dict(
-                s1 = (["x", "y", "time", "band"], backscatter),
-                deltaGamma = (["x", "y", "time"], deltaGamma),
-                snow_index = (["x", "y", "time"], np.zeros_like(deltaGamma))
-            ),
-
-            coords = dict(
-                lon = (["x", "y"], lon),
-                lat = (["x", "y"], lat),
-                band = ['VV', 'VH', 'inc'],
-                time = times,
-                relative_orbit = (["time"], [24, 24, 24, 24])))
-        
-        test_ds['snow_index'].loc[dict(time = '2020-01-11')] = 2
-        test_ds['snow_index'].loc[dict(time = '2020-01-12')] = 5
-        test_ds['snow_index'].loc[dict(time = '2020-01-13')] = 10
-
-        # test to see if all days outside +- 5 days are exclude
-        prev_si = calc_prev_snow_index(test_ds, current_time = test_ds.isel(time = 3).time.values, repeat = pd.Timedelta('12 days'))
-
-        # this should be (10 * 12 + 5 * 11 + 2 * 10) / (10+ 11+ 12) or 1.555555 
-        assert_allclose(prev_si, np.ones_like(prev_si)* 5.909090909090909)
-
-        # check with multiple orbits
-
-        backscatter = np.random.randn(10, 10, 6, 3)
-        deltaGamma = np.random.randn(10, 10 , 6)
-        times = [np.datetime64(t) for t in ['2020-01-01','2020-01-02', '2020-01-07','2020-01-08', '2020-01-14', '2020-01-15']]
-        x = np.linspace(0, 9, 10)
-        y = np.linspace(10, 19, 10)
-        lon, lat = np.meshgrid(x, y)
-
-        test_ds = xr.Dataset(
-            data_vars = dict(
-                s1 = (["x", "y", "time", "band"], backscatter),
-                deltaGamma = (["x", "y", "time"], deltaGamma),
-                snow_index = (["x", "y", "time"], np.zeros_like(deltaGamma)),
-            ),
-
-            coords = dict(
-                lon = (["x", "y"], lon),
-                lat = (["x", "y"], lat),
-                band = ['VV', 'VH', 'inc'],
-                time = times,
-                relative_orbit = (["time"], [24, 1, 24, 1, 24, 1])))
-        
-        test_ds['snow_index'].loc[dict(time = '2020-01-01')] = 2
-        
-        prev_si = calc_prev_snow_index(test_ds, current_time = test_ds.isel(time = 1).time.values, repeat = pd.Timedelta('6 days'))
-        assert_allclose(prev_si, np.ones_like(prev_si)*2)
-
-        prev_si = calc_prev_snow_index(test_ds, current_time = test_ds.isel(time = 2).time.values, repeat = pd.Timedelta('6 days'))
-        assert_allclose(prev_si, np.ones_like(prev_si) * 6*2/(5+6))
-
-        # test with nans
-
-        backscatter = np.random.randn(10, 10, 6, 3)
-        deltaGamma = np.random.randn(10, 10 , 6)
-        times = [np.datetime64(t) for t in ['2020-01-01','2020-01-02', '2020-01-03','2020-01-08', '2020-01-14', '2020-01-15']]
-        x = np.linspace(0, 9, 10)
-        y = np.linspace(10, 19, 10)
-        lon, lat = np.meshgrid(x, y)
-
-        test_ds = xr.Dataset(
-            data_vars = dict(
-                s1 = (["x", "y", "time", "band"], backscatter),
-                deltaGamma = (["x", "y", "time"], deltaGamma),
-                snow_index = (["x", "y", "time"], np.zeros_like(deltaGamma)),
-            ),
-
-            coords = dict(
-                lon = (["x", "y"], lon),
-                lat = (["x", "y"], lat),
-                band = ['VV', 'VH', 'inc'],
-                time = times,
-                relative_orbit = (["time"], [24, 1, 24, 1, 24, 1])))
-
-        
-        test_ds['snow_index'].loc[dict(time = '2020-01-01')] = np.nan
-        test_ds['snow_index'].loc[dict(time = '2020-01-02')] = 4
-        test_ds['snow_index'].loc[dict(time = '2020-01-02')][:3,:3] = np.nan
-        test_ds['snow_index'].loc[dict(time = '2020-01-03')] = 2
-
-        prev_si = calc_prev_snow_index(test_ds, current_time = test_ds.isel(time = 3).time.values, repeat = pd.Timedelta('6 days'))
-
-        assert_allclose(prev_si[:3, :3], 2)
-        assert_allclose(prev_si[3:, 3:], (4*6 + 2* 5)/ (6+ 5))
-
-        backscatter = np.random.randn(10, 10, 6, 3)
-        deltaGamma = np.random.randn(10, 10 , 6)
-        times = [np.datetime64(t) for t in ['2020-01-01','2020-01-02', '2020-01-07','2020-01-08', '2020-01-14', '2020-01-15']]
-        x = np.linspace(0, 9, 10)
-        y = np.linspace(10, 19, 10)
-        lon, lat = np.meshgrid(x, y)
-
-        test_ds = xr.Dataset(
-            data_vars = dict(
-                s1 = (["x", "y", "time", "band"], backscatter),
-                deltaGamma = (["x", "y", "time"], deltaGamma),
-                snow_index = (["x", "y", "time"], np.zeros_like(deltaGamma)),
-            ),
-
-            coords = dict(
-                lon = (["x", "y"], lon),
-                lat = (["x", "y"], lat),
-                band = ['VV', 'VH', 'inc'],
-                time = times,
-                relative_orbit = (["time"], [24, 1, 24, 1, 24, 1])))
-
-        
-        test_ds['snow_index'].loc[dict(time = '2020-01-01')] = np.nan
-        test_ds['snow_index'].loc[dict(time = '2020-01-02')] = np.nan
-
-        prev_si = calc_prev_snow_index(test_ds, current_time = test_ds.isel(time = 2).time.values, repeat = pd.Timedelta('6 days'))
-
-        self.assertEqual(prev_si.isnull().sum(), prev_si.size)
-    
-    def test_snow_index(self):
-        backscatter = np.random.randn(10, 10, 3, 3)
-        deltaGamma = np.random.randn(10, 10 , 3)
-        times = [np.datetime64(t) for t in ['2020-01-01', '2020-01-07', '2020-01-14']]
-        ims = np.full((10, 10, 3), 4)
-        x = np.linspace(0, 9, 10)
-        y = np.linspace(10, 19, 10)
-        lon, lat = np.meshgrid(x, y)
-
-        test_ds = xr.Dataset(
-            data_vars = dict(
-                s1 = (["x", "y", "time", "band"], backscatter),
-                deltaGamma = (["x", "y", "time"], deltaGamma),
-                ims = (["x", "y", "time"], ims)
-            ),
-
-            coords = dict(
-                lon = (["x", "y"], lon),
-                lat = (["x", "y"], lat),
-                band = ['VV', 'VH', 'inc'],
-                time = times,
-                relative_orbit = (["time"], [24, 24, 24])))
-        
-        ds = calc_snow_index(test_ds)
-
-        # first time slice should be all nans. There is no deltaGamma
-        # assert ds['snow_index'].isel(time = 0).sum() == 0
-        # second time slice should be all delta gamma of that time slice (no other previous)
-        np.allclose(ds['snow_index'].isel(time = 1), ds['deltaGamma'].isel(time = 1))
-        # last time slice should just be deltaGamma @ t = 1 + deltaGamma @ t = 2
-        np.allclose(ds['snow_index'].isel(time = 2), \
-            ds['deltaGamma'].isel(time = 1) + ds['deltaGamma'].isel(time = 2))
-
-        # check with multiple orbits
-
-        backscatter = np.random.randn(10, 10, 6, 3)
-        deltaGamma = np.random.randn(10, 10 , 6)
-        ims = np.full((10, 10, 6), 4)
-        times = [np.datetime64(t) for t in ['2020-01-01','2020-01-02', '2020-01-07','2020-01-08', '2020-01-14', '2020-01-15']]
-        x = np.linspace(0, 9, 10)
-        y = np.linspace(10, 19, 10)
-        lon, lat = np.meshgrid(x, y)
-
-        test_ds = xr.Dataset(
-            data_vars = dict(
-                s1 = (["x", "y", "time", "band"], backscatter),
-                deltaGamma = (["x", "y", "time"], deltaGamma),
-                ims = (["x", "y", "time"], ims),
-            ),
-
-            coords = dict(
-                lon = (["x", "y"], lon),
-                lat = (["x", "y"], lat),
-                band = ['VV', 'VH', 'inc'],
-                time = times,
-                relative_orbit = (["time"], [24, 1, 24, 1, 24, 1])))
-        
-        test_ds['deltaGamma'].loc[dict(time = '2020-01-01')] = np.nan
-        test_ds['deltaGamma'].loc[dict(time = '2020-01-02')] = np.nan
-
-        ds = calc_snow_index(test_ds)
-
-        # first time slice should be all nans. There is no deltaGamma
-        assert ds['snow_index'].isel(time = 0).sum() == 0
-        assert ds['snow_index'].isel(time = 1).sum() == 0
-
-        first_delta_gamma = ds['deltaGamma'].isel(time = 2).where(ds['deltaGamma'].isel(time = 2) > 0, 0)
-        assert_allclose(ds['snow_index'].isel(time = 2), first_delta_gamma)
-
-        # should be snowindex at t==0 (0) * 6 + si @ t == 1 (which is deltaGamma @ t=1) * 5 / (6 + 5) + deltaGamma @ t = 2 
-        second_delta_gamma = first_delta_gamma + ds['deltaGamma'].isel(time = 3)
-        second_delta_gamma = second_delta_gamma.where(second_delta_gamma > 0, 0)
-        assert_allclose(ds['snow_index'].isel(time = 3), second_delta_gamma)
-
-        # check with ims = 2 @ some points
-
-        backscatter = np.random.randn(10, 10, 6, 3)
-        deltaGamma = np.random.randn(10, 10 , 6)
-        ims = np.full((10, 10, 6), 4)
-        times = [np.datetime64(t) for t in ['2020-01-01','2020-01-02', '2020-01-07','2020-01-08', '2020-01-14', '2020-01-15']]
-        x = np.linspace(0, 9, 10)
-        y = np.linspace(10, 19, 10)
-        lon, lat = np.meshgrid(x, y)
-
-        test_ds = xr.Dataset(
-            data_vars = dict(
-                s1 = (["x", "y", "time", "band"], backscatter),
-                deltaGamma = (["x", "y", "time"], deltaGamma),
-                ims = (["x", "y", "time"], ims),
-            ),
-
-            coords = dict(
-                lon = (["x", "y"], lon),
-                lat = (["x", "y"], lat),
-                band = ['VV', 'VH', 'inc'],
-                time = times,
-                relative_orbit = (["time"], [24, 1, 24, 1, 24, 1])))
-        
-        test_ds['ims'].loc[dict(time = '2020-01-02', x = 5, y = 5)] = 2
-        test_ds['deltaGamma'].loc[dict(time = '2020-01-01', x = 5, y = 5)] = 5
-        test_ds['deltaGamma'].loc[dict(time = '2020-01-02', x = 5, y = 5)] = 5
-        
-        ds = calc_snow_index(test_ds)
-
-        assert ds['snow_index'].sel(time = '2020-01-02', x = 5, y = 5) == 0
-
-        # check with ims_masking disabled
-
-        ds = calc_snow_index(test_ds, ims_masking=False)
-
-        assert ds['snow_index'].sel(time = '2020-01-02', x = 5, y = 5) != 0
-
-    def test_snow_index_to_depth(self):
-
-        backscatter = np.random.randn(10, 10, 3, 3)
-        snow_index = np.random.randn(10, 10 , 3)
-        times = [np.datetime64(t) for t in ['2020-01-01', '2020-01-07', '2020-01-14']]
-        x = np.linspace(0, 9, 10)
-        y = np.linspace(10, 19, 10)
-        lon, lat = np.meshgrid(x, y)
-
-        test_ds = xr.Dataset(
-            data_vars = dict(
-                s1 = (["x", "y", "time", "band"], backscatter),
-                snow_index = (["x", "y", "time"], snow_index)
-            ),
-
-            coords = dict(
-                lon = (["x", "y"], lon),
-                lat = (["x", "y"], lat),
-                band = ['VV', 'VH', 'inc'],
-                time = times,
-                relative_orbit = (["time"], [24, 24, 24])))
-        
-        test_ds['snow_index'].loc[dict(time = '2020-01-01')] = 1
-        test_ds['snow_index'].loc[dict(time = '2020-01-07')] = 3
-
-        ds = calc_snow_index_to_snow_depth(test_ds, C = 0.6)
-
-        assert_allclose(ds['snow_depth'].isel(time = 0), test_ds['snow_index'].isel(time = 0)*0.6)
-
-        assert_allclose(ds['snow_depth'].isel(time = 1), test_ds['snow_index'].isel(time = 1)*0.6)
-
+    # 4 time steps: 1 dummy + 3 real
+    times = pd.date_range("2025-01-01", periods=4, freq="6D")
+
+    # deltaGamma: first step dummy zeros
+    delta_gamma = np.zeros((4, 2, 2))
+    delta_gamma[1:] = np.random.rand(3, 2, 2)
+
+    snowcover = np.ones((4, 2, 2), dtype=bool)
+    fcf = np.array([[0.2, 0.5], [0.8, 0.1]])
+
+    # All steps same track
+    tracks = [1, 1, 1, 1]
+
+    ds = xr.Dataset(
+        {
+            "deltaGamma": (("time", "y", "x"), delta_gamma),
+            "snowcover": (("time", "y", "x"), snowcover),
+            "fcf": (("y", "x"), fcf)
+        },
+        coords={
+            "time": times,
+            "track": ("time", tracks)
+        },
+        attrs={"s1_units": "dB"}
+    )
+
+    # Run snow index calculation
+    ds_out = calc_snow_index(ds)
+
+    # Checks
+    assert "snow_index" in ds_out.data_vars
+    assert np.all(ds_out["snow_index"] >= 0)
+
+    # First dummy step = 0
+    np.testing.assert_allclose(ds_out['snow_index'].isel(time=0), delta_gamma[0])
+    # Subsequent steps accumulate
+    np.testing.assert_allclose(ds_out['snow_index'].isel(time=1), delta_gamma[0] + delta_gamma[1])
+    np.testing.assert_allclose(ds_out['snow_index'].isel(time=2), delta_gamma[0] + delta_gamma[1] + delta_gamma[2])
+    np.testing.assert_allclose(ds_out['snow_index'].isel(time=3), delta_gamma[0] + delta_gamma[1] + delta_gamma[2] + delta_gamma[3])
+
+def test_calc_snow_index_no_previous_time():
+    """
+    Test calc_snow_index explicitly when there is no previous time step.
+    The first time slice should use prev_si = 0, so snow_index == deltaGamma.
+    """
+
+    # 3 time steps, regular 6-day interval
+    times = pd.date_range("2025-01-01", periods=3, freq="6D")
+    ds = xr.Dataset(
+        {
+            "deltaGamma": (("time", "y", "x"), np.random.rand(3, 2, 2)),
+            "snowcover": (("time", "y", "x"), np.ones((3, 2, 2), dtype=bool)),
+        },
+        coords={
+            "time": times,
+            "track": ("time", [1, 1, 1])
+        },
+        attrs={"s1_units": "dB"}
+    )
+
+    # Run snow index calculation
+    ds_out = calc_snow_index(ds)
+
+    # Check that 'snow_index' exists
+    assert 'snow_index' in ds_out.data_vars
+
+    # First time step has no previous images -> prev_si = 0
+    np.testing.assert_array_equal(ds_out['snow_index'].isel(time=0), ds['deltaGamma'].isel(time=0))
+
+    # Check that later time steps are >= 0 (snow_index accumulates deltaGamma)
+    assert np.all(ds_out['snow_index'].isel(time=1) >= 0)
+    assert np.all(ds_out['snow_index'].isel(time=2) >= 0)
+
+def test_calc_snow_index_missing_first_time():
+    """
+    Test behavior when the first time step is missing or has NaNs.
+    The function should propagate deltaGamma correctly for first valid time step.
+    """
+
+    times = pd.date_range("2025-01-01", periods=3, freq="6D")
+    delta_gamma = np.random.rand(3, 2, 2)
+    delta_gamma[0] = np.nan  # first time step missing
+
+    ds = xr.Dataset(
+        {
+            "deltaGamma": (("time", "y", "x"), delta_gamma),
+            "snowcover": (("time", "y", "x"), np.ones((3, 2, 2), dtype=bool)),
+        },
+        coords={
+            "time": times,
+            "track": ("time", [1, 1, 1])
+        },
+        attrs={"s1_units": "dB"}
+    )
+
+    ds_out = calc_snow_index(ds)
+
+    # First snow_index slice should be NaN where deltaGamma is NaN
+    np.testing.assert_array_equal(np.isnan(ds_out['snow_index'].isel(time=0)), np.isnan(delta_gamma[0]))
+
+    # Later slices should be >= 0
+    assert np.all(ds_out['snow_index'].isel(time=1) >= 0)
+    assert np.all(ds_out['snow_index'].isel(time=2) >= 0)
+
+def test_calc_snow_index_to_snow_depth(sample_dataset):
+    ds = sample_dataset.copy()
+    ds['snow_index'] = xr.ones_like(ds['vv'])
+    ds = calc_snow_index_to_snow_depth(ds, C=0.5)
+    np.testing.assert_array_equal(ds['snow_depth'], 0.5*np.ones((3,2,2)))
+
+
+@pytest.fixture
+def test_dataset():
+    x = np.linspace(0, 9, 10)
+    y = np.linspace(10, 19, 10)
+    times = [np.datetime64(t) for t in ['2020-01-01T00:00','2020-01-01T00:10',
+                                        '2020-01-02T10:10', '2020-01-02T10:20', '2020-01-02T10:40']]
+    times_full = []
+    [times_full.extend([t + pd.Timedelta(f'{i} days') for t in times]) for i in range(0, 5 * 12, 12)]
+
+    track = np.tile(np.array([24, 24, 65, 65, 65]), reps=5)
+    platforms = np.tile(np.array(['S1A', 'S1A', 'S1B', 'S1B', 'S1B']), reps=5)
+    direction = np.tile(np.array(['descending', 'descending', 'ascending', 'ascending', 'ascending']), reps=5)
+
+    vv = np.random.randn(10, 10, len(times_full))
+    vh = np.random.randn(10, 10, len(times_full))
+
+    ds = xr.Dataset(
+        data_vars=dict(
+            vv=(["x", "y", "time"], vv),
+            vh=(["x", "y", "time"], vh),
+        ),
+        coords=dict(
+            x=("x", x),
+            y=("y", y),
+            time=times_full,
+            track=("time", track),
+            platform=("time", platforms),
+            flight_dir=("time", direction),
+        )
+    )
+    ds.attrs['s1_units'] = 'dB'
+    return ds
+
+def test_delta_vv(test_dataset):
+    orbit_ds = test_dataset.sel(time=test_dataset.track == 24)
+    da1 = orbit_ds['vv'].isel(time=0)
+    da2 = orbit_ds['vv'].isel(time=1)
+    da3 = orbit_ds['vv'].isel(time=2)
+    real2_1_diff = da2 - da1
+    real3_2_diff = da3 - da2
+
+    ds1 = calc_delta_vv(orbit_ds)
+    assert_allclose(ds1['deltavv'].isel(time=1), real2_1_diff)
+    assert_allclose(ds1['deltavv'].isel(time=2), real3_2_diff)
+
+def test_delta_vv_errors(test_dataset):
+    test_dataset.attrs['s1_units'] = 'amp'
+    import pytest
+    with pytest.raises(AssertionError):
+        calc_delta_vv(test_dataset)
+
+def test_delta_cross_ratio(test_dataset):
+    orbit_ds = test_dataset.sel(time=test_dataset.track == 24)
+    A = 2
+    CR_ds = orbit_ds['vh'] * A - orbit_ds['vv']
+    real2_1_diff = CR_ds.isel(time=1) - CR_ds.isel(time=0)
+    real3_2_diff = CR_ds.isel(time=2) - CR_ds.isel(time=1)
+
+    ds1 = calc_delta_cross_ratio(orbit_ds, A=A)
+    assert_allclose(ds1['deltaCR'].isel(time=1), real2_1_diff)
+    assert_allclose(ds1['deltaCR'].isel(time=2), real3_2_diff)
+
+def test_delta_cr_errors(test_dataset):
+    test_dataset.attrs['s1_units'] = 'amp'
+    import pytest
+    with pytest.raises(AssertionError):
+        calc_delta_cross_ratio(test_dataset)

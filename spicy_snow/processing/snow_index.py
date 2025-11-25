@@ -1,5 +1,5 @@
 """
-Functions to calculate delta CR, delta VV, delta gamma, and snow index.
+Functions to calculate delta CR, delta vv, delta gamma, and snow index.
 """
 
 import numpy as np
@@ -11,14 +11,14 @@ from typing import Union
 import logging
 log = logging.getLogger(__name__)
 
-def calc_delta_VV(dataset: xr.Dataset, inplace: bool = False) -> Union[None, xr.Dataset]:
+def calc_delta_vv(dataset: xr.Dataset) -> Union[None, xr.Dataset]:
     """
-    Calculate change in VV amplitude between current time step and previous
+    Calculate change in vv amplitude between current time step and previous
     from each relative orbit and adds to dataset.
     
-    delta-gamma-VV (i, t) = gamma-VV (i, t) - gamma-VV(i, t_previous)
+    delta-gamma-vv (i, t) = gamma-vv (i, t) - gamma-vv(i, t_previous)
 
-    Returns nans in time slice of deltaVV with no previous image 
+    Returns nans in time slice of deltavv with no previous image 
     (first of each relative orbit)
 
     Args:
@@ -26,46 +26,41 @@ def calc_delta_VV(dataset: xr.Dataset, inplace: bool = False) -> Union[None, xr.
     inplace: operate on dataset in place or return copy
 
     Returns:
-    dataset: Xarray Dataset of sentinel images with 'deltaVV' added as data var
+    dataset: Xarray Dataset of sentinel images with 'deltavv' added as data var
     """
-    # check inplace flag
-    if not inplace:
-        dataset = dataset.copy(deep=True)
 
     # check for amp
-    if 's1_units' in dataset.attrs.keys():
-        assert dataset.attrs['s1_units'] == 'dB', 'Sentinel-1 units must be in dB'
+    assert dataset.attrs.get('s1_units') == 'dB', 'Sentinel-1 units must be in dB'
 
     # get all unique relative orbits
-    orbits = np.unique(dataset['relative_orbit'].values)
+    orbits = np.unique(dataset['track'].values)
 
     for orbit in orbits:
         
-        # Calculate change in gamma-VV between previous and current time step from the same relative orbit
-        diffVV = dataset['s1'].sel(time = dataset.relative_orbit == orbit, band = 'VV').diff(dim = 'time')
+        # Calculate change in gamma-vv between previous and current time step from the same relative orbit
+        diffvv = dataset['vv'].sel(time = dataset.track == orbit).diff(dim = 'time')
         
         # if adding new 
-        if 'deltaVV' not in dataset.data_vars:
-            # add delta-gamma-VV as variable to dataset
-            dataset['deltaVV'] = diffVV
+        if 'deltavv' not in dataset.data_vars:
+            # add delta-gamma-vv as variable to dataset
+            dataset['deltavv'] = diffvv
         
         else:
-            # update deltaVV times with this. 
-            dataset['deltaVV'].loc[dict(time = diffVV.time)] = diffVV
+            # update deltavv times with this. 
+            dataset['deltavv'].loc[dict(time = diffvv.time)] = diffvv
     
-    if not inplace:
-        return dataset
+    return dataset
 
-def calc_delta_cross_ratio(dataset: xr.Dataset, A: float = 2, inplace: bool = False) -> Union[None, xr.Dataset]:
+def calc_delta_cross_ratio(dataset: xr.Dataset, A: float = 2) -> Union[None, xr.Dataset]:
     """
     Calculate change in cross-polarization ratio for all time steps.
     
     delta-gamma-cr (i, t) = gamma-cr (i, t) - gamma-cr (i, t_previous)
 
     with:
-    gamma-cr = A * VH - VV
+    gamma-cr = A * vh - vv
 
-    and gamma-VH and gamma-VV in dB. Lieven's et al. 2021 tests A over [1, 2, 3]
+    and gamma-vh and gamma-vv in dB. Lieven's et al. 2021 tests A over [1, 2, 3]
     and fit to A = 2.
 
     Returns nans in time slice of deltaCR with no previous image 
@@ -80,25 +75,21 @@ def calc_delta_cross_ratio(dataset: xr.Dataset, A: float = 2, inplace: bool = Fa
     dataset: Xarray Dataset of sentinel images with deltaCR added as data var
     """
 
-    # check inplace flag
-    if not inplace:
-        dataset = dataset.copy(deep=True)
-
     # check for amp
-    if 's1_units' in dataset.attrs.keys():
-        assert dataset.attrs['s1_units'] == 'dB', 'Sentinel-1 units must be in dB'
+    assert dataset.attrs.get('s1_units') == 'dB', 'Sentinel-1 units must be in dB'
 
-    # calculate cross ratio of VH to VV with fitting parameter A
-    gamma_cr = (A * dataset['s1'].sel(band='VH')) - dataset['s1'].sel(band='VV')
+    # calculate cross ratio of vh to vv with fitting parameter A
+    # in dB so subtraction is actually a ratio in amplitude
+    gamma_cr = (A * dataset['vh']) - dataset['vv']
 
     # get all unique relative orbits
-    orbits = np.unique(dataset['relative_orbit'].values)
+    orbits = np.unique(dataset['track'].values)
     
     # Identify previous image from the same relative orbit (6, 12, 18, or 24 days ago)
     for orbit in orbits:
 
         # Calculate change in gamma-cr between previous and current time step
-        diffCR = gamma_cr.sel(time = dataset.relative_orbit == orbit).diff(dim = 'time')
+        diffCR = gamma_cr.sel(time = dataset.track == orbit).diff(dim = 'time')
         
         # add delta-gamma-cr as band to dataset
         # if adding new 
@@ -110,43 +101,37 @@ def calc_delta_cross_ratio(dataset: xr.Dataset, A: float = 2, inplace: bool = Fa
             # update deltaCR times with this. 
             dataset['deltaCR'].loc[dict(time = diffCR.time)] = diffCR
     
-    if not inplace:
-        return dataset
+    return dataset
 
-def calc_delta_gamma(dataset: xr.Dataset, B: float = 0.5, inplace: bool = False) -> Union[None, xr.Dataset]:
+def calc_delta_gamma(dataset: xr.Dataset, B: float = 0.5) -> Union[None, xr.Dataset]:
     """
-    Calculate change in combined gamma parameter (VV and cross-ratio) between 
+    Calculate change in combined gamma parameter (vv and cross-ratio) between 
     current time step and previous.
     
-    delta-gamma(i, t) = (1 - FCF) * delta-gamma-CR (i, t) + (FCF) * B * gamma-VV(i, t)
+    delta-gamma(i, t) = (1 - FCF) * delta-gamma-CR (i, t) + (FCF) * B * gamma-vv(i, t)
 
     with:
     FCF - being the PROBA-V fraction forest cover (ranging from 0 to 1).
     B - fitting parameter tested over 0 to 1 in steps of 0.1 and optimized at 0.5.
 
     Args:
-    dataset: Xarray Dataset of sentinel images with delta-gamma-cr and delta-gamma-VV
+    dataset: Xarray Dataset of sentinel images with delta-gamma-cr and delta-gamma-vv
 
     Returns:
     dataset: Xarray Dataset of sentinel images with delta-gamma added as band
     """
-    # check inplace flag
-    if not inplace:
-        dataset = dataset.copy(deep=True)
-
     # check to ensure fcf is 0-1 not 0-100
     assert dataset['fcf'].max() <= 1, "Forest cover fraction must be scaled 0-1"
     assert dataset['fcf'].min() >= 0, "Forest cover fraction must be scaled 0-1"
 
-    # Calculate delta gamma from delta-gamma-cr, delta-gamma-VV and FCF
+    # Calculate delta gamma from delta-gamma-cr, delta-gamma-vv and FCF
     # add delta-gamma as band to dataset
     dataset['deltaGamma'] = (1 - dataset['fcf']) * dataset['deltaCR'] + \
-        (dataset['fcf'] * B * dataset['deltaVV'])
+        (dataset['fcf'] * B * dataset['deltavv'])
 
-    if not inplace:
-        return dataset
+    return dataset
 
-def clip_delta_gamma_outlier(dataset: xr.Dataset, thresh: float = 3, inplace: bool = False) -> Union[None, xr.Dataset]: 
+def clip_delta_gamma_outlier(dataset: xr.Dataset, thresh: float = 3) -> Union[None, xr.Dataset]: 
     """
     Clip delta gamma to -3 -> 3 dB
 
@@ -158,18 +143,13 @@ def clip_delta_gamma_outlier(dataset: xr.Dataset, thresh: float = 3, inplace: bo
     dataset: Xarray Dataset of sentinel images with delta gamma changes clipped
     to -3 -> 3
     """
-    # check inplace flag
-    if not inplace:
-        dataset = dataset.copy(deep=True)
-
     # change values above 3 and not nan to 3
     dataset['deltaGamma'] = dataset['deltaGamma'].where((dataset['deltaGamma'] < thresh) | dataset['deltaGamma'].isnull(), thresh)
     
     # change values below -3 and not nan to -3
     dataset['deltaGamma'] = dataset['deltaGamma'].where((dataset['deltaGamma'] > -thresh) | dataset['deltaGamma'].isnull(), -thresh)
     
-    if not inplace:
-        return dataset
+    return dataset
 
 def find_repeat_interval(dataset: xr.Dataset) -> pd.Timedelta:
     """
@@ -183,7 +163,7 @@ def find_repeat_interval(dataset: xr.Dataset) -> pd.Timedelta:
     repeat: pandas timedelta and number of days between images
     """
     # figure out if 6 or 12 days repeat
-    orbit_times = dataset.sel(time = dataset.relative_orbit == dataset['relative_orbit'][0]).time.diff(dim = 'time').values
+    orbit_times = dataset.sel(time = dataset.track == dataset['track'][0]).time.diff(dim = 'time').values
     repeat = np.nanmedian([pd.Timedelta(i).round('D') for i in orbit_times]).round('D')
 
     assert repeat.days % 6 == 0, f"Calculated repeat interval, {repeat}, is not multiple of 6 days."
@@ -216,6 +196,12 @@ def calc_prev_snow_index(dataset: xr.Dataset, current_time: np.datetime64, repea
     # slice dataset to get all images in previous period
     prev = dataset.sel(time = slice(t_oldest, t_youngest))
 
+    # TODO
+    # check this edge case of no previous data found.
+    if prev.sizes['time'] == 0:
+        prev_si = xr.zeros_like(dataset['snow_index'].isel(time=0))
+        return prev_si
+
     # calculate weights based on days between centered date and image acquistions
     day_weights = repeat.days - np.abs([int((t - t_prev).days) for t in prev.time.values])
     wts = xr.ones_like(prev['snow_index']) * day_weights
@@ -231,7 +217,7 @@ def calc_prev_snow_index(dataset: xr.Dataset, current_time: np.datetime64, repea
 
     return prev_si
 
-def calc_snow_index(dataset: xr.Dataset, ims_masking: bool = True, inplace: bool = False) -> Union[None, xr.Dataset]:
+def calc_snow_index(dataset: xr.Dataset, ims_masking: bool = True) -> Union[None, xr.Dataset]:
     """
     Calculate snow index for each time step from previous time steps' snow index
     weights, and current delta-gamma.
@@ -249,9 +235,6 @@ def calc_snow_index(dataset: xr.Dataset, ims_masking: bool = True, inplace: bool
     Returns:
     dataset: Xarray Dataset of sentinel images with snow-index added as band
     """
-    # check inplace flag
-    if not inplace:
-        dataset = dataset.copy(deep=True)
 
     # set all snow index to 0 to start
     dataset['snow_index'] = xr.zeros_like(dataset['deltaGamma'])
@@ -273,17 +256,16 @@ def calc_snow_index(dataset: xr.Dataset, ims_masking: bool = True, inplace: bool
         
         # change to 0 when ims snow cover is not 4
         if ims_masking:
-            dataset['snow_index'].loc[dict(time = ct)] = dataset['snow_index'].sel(time = ct).where(dataset['ims'].sel(time = ct) == 4, 0)
+            dataset['snow_index'].loc[dict(time = ct)] = dataset['snow_index'].sel(time = ct).where(dataset['snowcover'].sel(time = ct) == True, 0)
 
         # change to 0 when snow_index is negative
         dataset['snow_index'].loc[dict(time = ct)] = \
             dataset['snow_index'].sel(time = ct).where((dataset['snow_index'].sel(time = ct).isnull()) | (dataset['snow_index'].sel(time = ct) > 0), 0)
     
-    if not inplace:
-        return dataset
+    return dataset
 
 
-def calc_snow_index_to_snow_depth(dataset: xr.Dataset, C: float = 0.44, inplace: bool = False) -> Union[None, xr.Dataset]:
+def calc_snow_index_to_snow_depth(dataset: xr.Dataset, C: float = 0.44) -> Union[None, xr.Dataset]:
     """
     Convert current snow-index to snow depth using the C parameter. Varied 
     from [0->1 by 0.01].
@@ -296,11 +278,7 @@ def calc_snow_index_to_snow_depth(dataset: xr.Dataset, C: float = 0.44, inplace:
     Returns:
     dataset: Xarray Dataset of sentinel images with retrieved snow depth
     """
-    # check inplace flag
-    if not inplace:
-        dataset = dataset.copy(deep=True)
     
     dataset['snow_depth'] = dataset['snow_index'] * C
 
-    if not inplace:
-        return dataset
+    return dataset

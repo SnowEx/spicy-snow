@@ -1,4 +1,6 @@
 """
+Legacy code kept from previous hyp3 pipeline.
+
 Functions to search and download Sentinel-1 images for specific geometries and dates
 """
 
@@ -22,13 +24,20 @@ from typing import Dict, Tuple, List, Union
 import sys
 from os.path import expanduser
 sys.path.append(expanduser('~/Documents/spicy-snow'))
-from spicy_snow.utils.download import url_download
-from spicy_snow.processing.s1_preprocessing import s1_power_to_dB
+from asf_search import download_url as url_download
+import sys
+from pathlib import Path
+project_root = Path(__file__).resolve().parent.parent.parent.parent
+sys.path.insert(0, str(project_root))
+
+from spicy_snow.processing.s1_preprocessing import amplitude_to_dB as s1_power_to_dB
 
 import logging
 log = logging.getLogger(__name__)
 
-def s1_img_search(area: shapely.geometry.Polygon, dates: Tuple[str, str]) -> pd.DataFrame:
+
+
+def s1_hyp3_search(area: shapely.geometry.Polygon, dates: Tuple[str, str]) -> pd.DataFrame:
     """
     find dates and url of Sentinel-1 overpasses
 
@@ -56,6 +65,7 @@ def s1_img_search(area: shapely.geometry.Polygon, dates: Tuple[str, str]) -> pd.
     if area.bounds[3] > 90 or area.bounds[1] < 0 or area.bounds[2] > 180\
         or area.bounds[0] < -180:
         raise IndexError("Coordinates must be between 0-90N and -180-180")
+    # TODO warnings for period of only s1b, when s1c started injestion on May 20th 2025
 
     # get results from asf_search in date range and geometry
     results = asf.geo_search(platform = [asf.PLATFORM.SENTINEL1], intersectsWith = area.wkt,\
