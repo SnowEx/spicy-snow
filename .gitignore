@@ -130,6 +130,10 @@ dmypy.json
 
 # MacOs
 *DS_Store
+
+#vscode
+.vscode/
+
 # Individual Contibutors
 data/*
 *.pkl
