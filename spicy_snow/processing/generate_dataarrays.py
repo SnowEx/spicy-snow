@@ -144,7 +144,6 @@ def generate_sentinel1_dataarray(
     times = []
     tracks = []
     for fp in pol_fps:
-        print(fp)
         if 'opera' in fp.stem.lower():
             t = pd.to_datetime(fp.stem.split('_')[4], format='%Y%m%dT%H%M%SZ')
             track = int(fp.stem.split('_')[3].split('-')[0][1:])
