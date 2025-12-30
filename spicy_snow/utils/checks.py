@@ -83,11 +83,15 @@ def validate_dates(start_date, end_date):
     else:
         raise ValueError("end_date cannot be None")
 
+    # ---- Check for timezone consistency ---- #
+    if start.tz != end.tz:
+        raise ValueError("start_date and end_date must have the same timezone")
+
     # ---- Basic range checks ----
     if start.year < 2014 or end.year < 2014:
         raise ValueError("Dates must be in or after 2014 (Sentinel-1A launch).")
 
-    today = pd.to_datetime(date.today())
+    today = pd.to_datetime(date.today()) if start.tz is None else pd.Timestamp.now(tz=start.tz)
 
     if start > today or end > today:
         raise ValueError("Dates cannot be in the future.")
@@ -99,8 +103,8 @@ def validate_dates(start_date, end_date):
     # S1B failed: Dec 23, 2021 →
     # S1C operational: May 20, 2025
 
-    s1b_fail = pd.to_datetime("2021-12-23")
-    s1c_start = pd.to_datetime("2025-05-20")
+    s1b_fail = pd.to_datetime("2021-12-23").tz_localize(start.tz) if start.tz else pd.to_datetime("2021-12-23")
+    s1c_start = pd.to_datetime("2025-05-20").tz_localize(start.tz) if start.tz else pd.to_datetime("2025-05-20")
     if end >= s1b_fail and end < s1c_start:
         warnings.warn(
             "Date range intersects the Sentinel-1B outage period (Dec 2021 → present). "

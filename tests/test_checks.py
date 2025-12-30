@@ -2,6 +2,8 @@ import pytest
 import warnings
 from datetime import datetime, timedelta, date
 from shapely.geometry import box, Polygon
+import pandas as pd
+
 
 from spicy_snow.utils.checks import (
     validate_urls,
@@ -76,6 +78,36 @@ def test_validate_dates_missing_start_or_end():
         validate_dates(None, "2020-01-01")
     with pytest.raises(ValueError):
         validate_dates("2020-01-01", None)
+
+def test_validate_dates_mismatched_timezones():
+    start = pd.Timestamp("2020-01-01", tz="UTC")
+    end = pd.Timestamp("2020-01-02", tz="US/Pacific")
+
+    with pytest.raises(ValueError, match="same timezone"):
+        validate_dates(start, end)
+
+def test_validate_dates_same_timezone_aware_ok():
+    start = pd.Timestamp("2020-01-01 00:00", tz="UTC")
+    end = pd.Timestamp("2020-01-02 00:00", tz="UTC")
+
+    # Should not raise
+    validate_dates(start, end)
+
+def test_validate_dates_timezone_future_rejected():
+    tz = "UTC"
+    tomorrow = pd.Timestamp.now(tz=tz) + pd.Timedelta(days=1)
+
+    start = tomorrow
+    end = tomorrow + pd.Timedelta(days=1)
+
+    with pytest.raises(ValueError, match="future"):
+        validate_dates(start, end)
+
+def test_validate_dates_naive_ok():
+    start = "2020-01-01"
+    end = "2020-01-02"
+
+    validate_dates(start, end)
 
 # ----------------------------
 # validate_aoi tests
