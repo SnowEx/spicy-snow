@@ -26,62 +26,54 @@ pip install spicy-snow
 ## Example usage:
 
 ```python
-from pathlib import Path
 
-# Add main repo to path if you haven't added with conda-develop
+# Add main repo to path if not pip installed
 # import sys
 # sys.path.append('path/to/the/spicy-snow/')
 
+from pathlib import Path
 from spicy_snow.retrieval import retrieve_snow_depth
-from spicy_snow.IO.user_dates import get_input_dates
-import shapely
 
 # change to your minimum longitude, min lat, max long, max lat
-area = shapely.geometry.box(-113.2, 43, -113, 43.4)
+test_aoi = [-114.5, 43, -114, 44]
+
+# can also be a point for point based retrievals
+# test_aoi = [-114.2, 43.75]
+
+# you will want to start before the snowfalls since this is a change detection method
+dates = ['2020-10-01', '2021-05-01']
 
 # this will be where your results are saved
-out_nc = Path('~/Desktop/spicy-test/test.nc').expanduser()
+out_nc = Path('./test.nc').resolve()
 
-# this will generate a tuple of dates from the previous August 1st to this date
-dates = get_input_dates('2021-04-01') # run on all s1 images from (2020-08-01, 2021-04-01) in this example
+# resolution in meters to work at (100, 500, 1km all have been tested).
+# default is 100 meters
+spatial_resolution = 100
 
-spicy_ds = retrieve_snow_depth(area = area, dates = dates, 
-                               work_dir = Path('~/Desktop/spicy-test/').expanduser(), 
-                               job_name = f'testing_spicy',
-                               existing_job_name = 'testing_spicy',
+# data source can be either "opera" RTC or "hyp3" cloud processed
+# opera is much faster and doesn't require hyp3 credits
+# hyp3 uses gamma processing and may be cleaner
+source = 'opera' # other option "hyp3"
+
+spicy_ds = retrieve_snow_depth(aoi = test_aoi, dates = dates, 
+                               work_dir = Path('./spicy-test/').resolve(), 
+                               resolution = spatial_resolution,
                                debug=False,
+                               source = source
                                outfp=out_nc)
 ```
 
-### Running over large areas/memory issues
 
-If you are running out of memory or running over multiple degrees of latitude this code snippet should get you started on batch processing swathes.
 
-```python
-from shapely import geometry
-from itertools import product
-for lon_min, lat_min in product(range(-117, -113), range(43, 46)):
-    area = shapely.geometry.box(lon_min, lat_min, lon_min + 1, lat_min + 1)
-    out_nc = Path(f'~/Desktop/spicy-test/swath_{lon_min}-{lon_min + 1}_{lat_min}-{lat_min + 1}.nc').expanduser()
-    if out_nc.exists():
-        continue
 
-    spicy_ds = retrieve_snow_depth(area = area, dates = dates, 
-                                work_dir = Path('~/scratch/spicy-lowman-quadrant/data/').expanduser(), 
-                                job_name = f'spicy-lowman-{lon_min}-{lon_min + 1}_{lat_min}-{lat_min + 1}', # v1
-                                existing_job_name = f'spicy-lowman-{lon_min}-{lon_min + 1}_{lat_min}-{lat_min + 1}', # v1
-                                debug=False,
-                                outfp=out_nc)
-
-```
-
-Description of the output netcdf variables.
+## Description of the output netcdf variables.
 
  - wet_snow: layer showing layers flagged as wet snow (1 = wet, 0 = dry)
  - snow_depth: derived snow depth in meters
- - ims: snow coverage binary mask (2 = no snow, 4 = snow)
+ - snowcover: snow coverage binary mask (True = snow on, False = snow-free)
  - fcf: forest coverage percentage
- - s1: raw sentinel-1 with 3 bands for VV, VH backscatter in dB and incidence angle
+ - vv: gamma0 sentinel-1 VV backscatter in dB
+ - vh: gamma0 sentinel-1 VH backscatter in dB
 
 All the other layers are intermediate layers for if you want to explore the processing pipeline.
 
@@ -121,11 +113,34 @@ Title image: https://openai.com/dall-e-2/
 
 ## Contact
 
-Zach Hoppinen: zacharyhoppinen@u.boisestate.edu
+Zach Hoppinen: zmhoppinen@alaska.edu
 
 Project Link: https://github.com/SnowEx/spicy-snow
 
+## Data Sources
+
+Sentinel-1 RTCs are downloaded from the Alaska Satellite Facility and processed by [JPL's Opera Project](https://github.com/opera-adt/RTC). Forest cover within CONUS comes from the National Land Cover Database, otherwise from the Proba-V forest cover. Snow coverage is from the VIIRS snow cover product. See and use citations below. 
+
+## Citations
+
+Work using this repository should cite it and the following datasources
+NASA/JPL/OPERA. (2023). OPERA Co-registered Single Look Complex from Sentinel-1 validated product (Version 1) [Data set]. NASA Alaska Satellite Facility Distributed Active Archive Center. https://doi.org/10.5067/SNWG/OPERA_L2_CSLC-S1_V1 Date Accessed: 2025-11-18
+
+Riggs, G. A., Hall, D. K. & Román, M. O. (2019). VIIRS/NPP Snow Cover Daily L3 Global 375m SIN Grid. (VNP10A1, Version 1). [Data Set]. Boulder, Colorado USA. NASA National Snow and Ice Data Center Distributed Active Archive Center. https://doi.org/10.5067/VIIRS/VNP10A1.001. [describe subset used if applicable]. Date Accessed 11-18-2025.
+
+U.S. Geological Survey (USGS), 2024, Annual NLCD Collection 1 Science Products (ver. 1.1, June 2025): U.S. Geological Survey data release, https://doi.org/10.5066/P94UXNTS.
+
 ## Links to relevant repos/sites
+
+Opera S1 RTC Products:
+https://www.earthdata.nasa.gov/data/catalog/asf-opera-l2-cslc-s1-v1-1
+https://asf.alaska.edu/datasets/daac/opera/
+
+VIIRS Snow Fractional Coverage
+https://nsidc.org/data/vnp10a1/versions/1
+
+Annual National Land Cover Database
+https://www.usgs.gov/centers/eros/science/annual-national-land-cover-database
 
 Sentinel 1 Download:
 https://github.com/ASFHyP3/hyp3-sdk

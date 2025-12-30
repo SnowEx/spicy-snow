@@ -170,4 +170,5 @@ scripts/optimize/param_sds
 
 *.nfs*
 
+.vscode/
 local/

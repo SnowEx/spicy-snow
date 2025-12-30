@@ -1,115 +1,113 @@
-import unittest
-from unittest.mock import MagicMock
-from numpy.testing import assert_allclose
-import pandas.testing as pd_testing
+import pytest
+import gzip
+from pathlib import Path
+from unittest.mock import patch, MagicMock
 
-import numpy as np
-import xarray as xr
-import pandas as pd
-import pickle
+from spicy_snow.utils.download import (
+    download_urls,
+    download_urls_parallel,
+    decompress,
+    download_proba_v
+)
 
-from shapely.geometry import box
+# ----------------------------
+# Fixtures
+# ----------------------------
 
-import sys
-from os.path import expanduser
-sys.path.append(expanduser('.'))
-from spicy_snow.download.sentinel1 import s1_img_search, combine_s1_images
-from spicy_snow.utils.raster import to01
+@pytest.fixture
+def tmp_out_dir(tmp_path):
+    return tmp_path
 
-class TestSentinel1Search(unittest.TestCase):
-    """
-    Test functionality of searching sentinel-1 granule names from dates and geometry.
-    """
+@pytest.fixture
+def sample_urls(tmp_path):
+    file1 = tmp_path / "file1.txt"
+    file1.write_text("hello")
+    file2 = tmp_path / "file2.txt"
+    file2.write_text("world")
+    return [str(file1), str(file2)]
 
-    area = box(-114.4, 43, -114.3, 43.1)
-    dates = ('2019-12-28', '2020-02-02')
-    search_result = s1_img_search(area, dates)
+# ----------------------------
+# decompress tests
+# ----------------------------
 
-    def test_search_return_type(self, search_result = search_result):
-        """
-        Test return type of Sentinel-1 search
-        """
-        self.assertEqual(type(search_result), pd.DataFrame, "Seach results should return DataFrame")
-    
-    def test_search_return_number(self, search_result = search_result):
-        """
-        Test if sentinel-1 search returns expected number of results
-        """
-        # Expected number of Sentinel-1 images
-        self.assertEqual(len(search_result), 14, "Seach results should contain XXX images")
-    
-    
-    def test_search_exceptions(self, area = area, dates = dates):
-        """
-        Test thrown exceptions/errors in sentinel 1 image searches.
-        """
-        # Incorrect number/type of inputs
-        self.assertRaises(TypeError, s1_img_search, area, '2019-12-30')
-        self.assertRaises(TypeError, s1_img_search, area, 1)
-        self.assertRaises(TypeError, s1_img_search, area, [])
-        self.assertRaises(TypeError, s1_img_search, [-115, 46, -115.5, 46.5], dates)
-        self.assertRaises(TypeError, s1_img_search, dates)
-        self.assertRaises(TypeError, s1_img_search, [], dates)
-        self.assertRaises(TypeError, s1_img_search, ['-115', '46', '-115.5', '46.5'], dates)
+def test_decompress(tmp_path):
+    in_fp = tmp_path / "test.txt.gz"
+    out_fp = tmp_path / "test.txt"
 
-        # Logical errors in inputs
-        # dates are reverse
-        self.assertRaises(ValueError, s1_img_search, area, ('2021-01-02','2020-01-02'))
-        # dates are in future or too far in past
-        self.assertRaises(IndexError, s1_img_search, area, ('2030-01-02','2032-01-02'))
-        self.assertRaises(IndexError, s1_img_search, area, ('1999-01-02','2000-01-02'))
-        # geometry outside of acceptable bounds or in non-geographic coordinates
-        self.assertRaises(IndexError, s1_img_search, box(-115, -46, -115.5, -46.5), dates)
-        self.assertRaises(IndexError, s1_img_search, box(300000, 50000, 300000, 55000), dates)
+    # compress some data
+    in_fp.write_bytes(gzip.compress(b"hello world"))
 
-    das = {}
-    granules = ['S1B_IW_GRDH_1SDV_20200201T013528_20200201T013553_020069_025FB3_6D5E',
-    'S1B_IW_GRDH_1SDV_20200130T134920_20200130T134948_020047_025EF4_9218',
-    'S1B_IW_GRDH_1SDV_20200127T012726_20200127T012751_019996_025D37_D0F0',
-    'S1A_IW_GRDH_1SDV_20200126T013605_20200126T013634_030965_038E37_760E',
-    'S1A_IW_GRDH_1SDV_20200124T135002_20200124T135027_030943_038D6F_FED5']
-    for i in range(5):
-        backscatter = np.random.randn(10, 10, 3)
-        backscatter = to01(backscatter)
+    result_fp = decompress(in_fp, out_fp)
+    assert result_fp == out_fp
+    assert out_fp.read_text() == "hello world"
 
-        x = np.linspace(0, 9, 10)
-        y = np.linspace(10, 19, 10)
-        lon, lat = np.meshgrid(x, y)
+# ----------------------------
+# download_urls tests
+# ----------------------------
 
-        da = xr.DataArray(data = backscatter,
-            dims = ["x","y","band"],
-            coords = dict(
-                lon=(["x", "y"], lon),
-                lat=(["x", "y"], lat),
-                band = ['VV', 'VH', 'inc'],
-                )
-        )
-        
-        das[granules[i]] = da
+@patch("spicy_snow.utils.download.download_url")
+@patch("spicy_snow.utils.download.validate_urls")
+@patch("asf_search.ASFSession")
+def test_download_urls_basic(mock_session, mock_validate, mock_download, tmp_out_dir):
+    # mock validate_urls to just return urls
+    urls = ["http://example.com/file1", "http://example.com/file2"]
+    mock_validate.return_value = urls
 
-    def test_combine_s1_imgs(self, das = das):
-        ds = combine_s1_images(das)
+    mock_download.side_effect = lambda url, out_dir, session=None: Path(out_dir) / Path(url).name
 
-        self.assertEqual(type(ds), xr.Dataset)
+    results = download_urls(urls, tmp_out_dir)
+    assert all(isinstance(fp, Path) for fp in results)
+    assert [fp.name for fp in results] == ["file1", "file2"]
 
-        self.assertEqual(len(ds.time), 5)
-        self.assertEqual(len(ds.flight_dir), 5)
-        self.assertEqual(len(ds.platform), 5)
-        self.assertEqual(len(ds.relative_orbit), 5)
+@patch("spicy_snow.utils.download.download_url")
+@patch("spicy_snow.utils.download.validate_urls")
+@patch("asf_search.ASFSession")
+def test_download_urls_reprocess(mock_session, mock_validate, mock_download, tmp_out_dir):
+    urls = ["http://example.com/file1"]
+    mock_validate.return_value = urls
+    mock_download.side_effect = lambda url, out_dir, session=None: Path(out_dir) / Path(url).name
 
-        self.assertEqual(len(ds.band), 3)
+    # Create file manually to simulate existing download
+    existing_fp = tmp_out_dir / "file1"
+    existing_fp.write_text("existing content")
 
-        self.assertEqual(ds.attrs['s1_units'], 'dB')
-        self.assertEqual(ds.attrs['resolution'], '90')
+    # reprocess=False should skip download
+    results = download_urls(urls, tmp_out_dir, reprocess=False)
+    assert results[0] == existing_fp
 
-        expected_t2 = das['S1B_IW_GRDH_1SDV_20200127T012726_20200127T012751_019996_025D37_D0F0']#.coarsen(x = 3, boundary = 'trim').mean().coarsen(y = 3, boundary = 'trim').mean()
-        expected_t2.loc[dict(band = ['VV', 'VH'])] = 10 * np.log10(expected_t2.sel(band = ['VV', 'VH']))
-        expected_t2 = expected_t2.where(expected_t2 > -1e10)
-        expected_t2 = expected_t2.where(expected_t2 < 1e10)
+    # reprocess=True should call download
+    results = download_urls(urls, tmp_out_dir, reprocess=True)
+    assert results[0].name == "file1"
 
-        self.assertEqual(ds.isel(time = 0)['s1'].shape, (10, 10, 3))
+# ----------------------------
+# download_urls_parallel tests
+# ----------------------------
 
-        # assert_allclose(expected_t2, ds.isel(time = 2)['s1'])
+@patch("spicy_snow.utils.download.requests.Session")
+@patch("spicy_snow.utils.download.validate_urls")
+def test_download_urls_parallel_basic(mock_validate, mock_session_cls, tmp_out_dir):
+    urls = ["http://example.com/file1", "http://example.com/file2"]
+    mock_validate.return_value = urls
 
-if __name__ == '__main__':
-    unittest.main()
+    # mock session.get to return dummy response
+    mock_session = MagicMock()
+    mock_session.get.return_value.__enter__.return_value.iter_content.return_value = [b"data"]
+    mock_session.get.return_value.__enter__.return_value.raise_for_status.return_value = None
+    mock_session_cls.return_value = mock_session
+
+    results = download_urls_parallel(urls, tmp_out_dir, max_workers=2)
+    assert all(isinstance(fp, Path) for fp in results)
+    assert sorted([fp.name for fp in results]) == ["file1", "file2"]
+
+
+# ----------------------------
+# download_proba_v test
+# ----------------------------
+
+@patch("spicy_snow.utils.download.download_url")
+def test_download_proba_v(mock_download, tmp_out_dir):
+    out_fp = tmp_out_dir / "proba.tif"
+    mock_download.return_value = out_fp
+
+    result = download_proba_v(out_fp)
+    assert result == out_fp
