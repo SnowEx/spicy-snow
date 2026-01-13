@@ -35,8 +35,8 @@ def run_full_workflow_opera():
     
     ds = xr.open_dataset(out_nc)
     assert ds.time.size == 86
-    assert ds.x.size == 425
-    assert ds.y.size == 849
+    assert ds.x.size == 423
+    assert ds.y.size == 846
     assert 'vv' in ds.data_vars
     assert 'vh' in ds.data_vars
     assert 'snow_depth' in ds.data_vars

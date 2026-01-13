@@ -41,6 +41,7 @@ def retrieve_snow_depth(aoi: shapely.geometry.Polygon,
                         work_dir: str = './',
                         source = 'opera',
                         resolution = 100,
+                        job_name = None,
                         debug: bool = False,
                         ims_masking: bool = True,
                         wet_snow_thresh: float = -2,
@@ -104,7 +105,7 @@ def retrieve_snow_depth(aoi: shapely.geometry.Polygon,
     log.info("Downloading sentinel-1 gamma0 backscatter data")
 
     # get sentinel 1 data search results
-    s1_urls = get_sentinel1_urls(start_date = dates[0], stop_date = dates[1], aoi = aoi, source = source)
+    s1_urls = get_sentinel1_urls(start_date = dates[0], stop_date = dates[1], aoi = aoi, source = source, job_name = job_name)
     # Keep only necessary downloads vv, vh, mask.
     s1_urls = [u for u in s1_urls if u.endswith(('_VV.tif', '_VH.tif', '_mask.tif'))]
     # download sentinel urls

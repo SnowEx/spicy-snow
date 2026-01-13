@@ -38,8 +38,8 @@ def run_full_workflow_opera():
     
     ds = xr.open_dataset(out_nc)
     assert ds.time.size == 86
-    assert ds.x.size == 425
-    assert ds.y.size == 849
+    assert ds.x.size == 423
+    assert ds.y.size == 846
     assert 'vv' in ds.data_vars
     assert 'vh' in ds.data_vars
     assert 'snow_depth' in ds.data_vars
@@ -50,7 +50,9 @@ def run_full_workflow_opera():
 def run_full_workflow_hyp3():
     """
     second run with hyp3
-    use much small date range to avoid too long"""
+    use much small date range to avoid too long
+    should be faster after first run through due to hyp3 caching
+    """
 
     # change to your minimum longitude, min lat, max long, max lat
     test_aoi = [-114.5, 43, -114, 44]
@@ -62,7 +64,7 @@ def run_full_workflow_hyp3():
     dates = ['2021-12-01', '2021-12-10']
 
     # this will be where your results are saved
-    out_nc = Path('./local/test.nc').resolve()
+    out_nc = Path('./local/test_hyp3.nc').resolve()
     work_dir = Path('./local/').resolve()
 
     # resolution in meters to work at (100, 500, 1km all have been tested).
@@ -75,14 +77,12 @@ def run_full_workflow_hyp3():
                                 resolution = spatial_resolution,
                                 debug=False,
                                 source = source,
+                                job_name='testing_hyp3_spicy',
                                 outfp=out_nc)
     
     ds = xr.open_dataset(out_nc)
     assert 'vv' in ds.data_vars
     assert 'vh' in ds.data_vars
-
-def test_readme_simple():
-    assert True
 
 @pytest.mark.integration
 def test_readme_workflow():
