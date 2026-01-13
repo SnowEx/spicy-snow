@@ -122,6 +122,21 @@ def sample_resampled_average(src, img, aoi, target_res):
     window = img[r0:r1, c0:c1]
     return np.nanmean(window)
 
+def generate_reference_grid(ref_fp, resolution, aoi):
+    ref = xr.open_dataarray(ref_fp, chunks="auto")[0]
+    assert ref.rio.crs.is_projected
+    ref = ref.rio.reproject(dst_crs=ref.rio.crs, resolution=resolution, align = True)
+    ref = ref.rio.reproject("EPSG:4326")
+    if isinstance(aoi, shapely.geometry.point.Point):
+        crs = ref.rio.crs
+        xres, yres = ref.rio.resolution()
+        transform = generate_point_transform(x = aoi.x, y = aoi.y, xres = xres, yres = yres)
+        ref = sel_1point_da_to_2d_array(ref, aoi.y, aoi.x, crs, transform)
+    else:
+        ref = ref.rio.clip_box(*aoi.bounds).rio.pad_box(*aoi.bounds)
+    
+    return ref
+
 def generate_sentinel1_dataarray(
     s1_fps,
     aoi,
@@ -137,6 +152,8 @@ def generate_sentinel1_dataarray(
     aoi = validate_aoi(aoi)
     pol = pol.lower()
 
+    # sorting to ensure reference is first
+    s1_fps = sorted(s1_fps)
     # Filter relevant products
     pol_fps = [f for f in s1_fps if f.stem.lower().endswith(pol)]
 
@@ -158,20 +175,11 @@ def generate_sentinel1_dataarray(
         times.append(t)
         tracks.append(track)
 
-    # ---- Build reference grid ----
+    # ---- Build reference grid ---- #
     if ref is None:
-        ref = xr.open_dataarray(pol_fps[0], chunks="auto")[0]
-        assert ref.rio.crs.is_projected
-        ref = ref.rio.reproject(dst_crs=ref.rio.crs, resolution=resolution)
-        ref = ref.rio.reproject("EPSG:4326")
-        if isinstance(aoi, shapely.geometry.point.Point):
-            crs = ref.rio.crs
-            xres, yres = ref.rio.resolution()
-            transform = generate_point_transform(x = aoi.x, y = aoi.y, xres = xres, yres = yres)
-            ref = sel_1point_da_to_2d_array(ref, aoi.y, aoi.x, crs, transform)
-        else:
-            ref = ref.rio.clip_box(*aoi.bounds).rio.pad_box(*aoi.bounds)
-
+        # sorted so this should be consistent
+        ref_fp = pol_fps[0]
+        ref = generate_reference_grid(ref_fp, resolution, aoi)
     dst_crs = ref.rio.crs
     dst_transform = ref.rio.transform()
     dst_shape = ref.shape
