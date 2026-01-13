@@ -39,7 +39,7 @@ from spicy_snow.utils.download import download_urls, download_urls_parallel
 def retrieve_snow_depth(aoi: shapely.geometry.Polygon, 
                         dates: Tuple[str, str], 
                         work_dir: str = './',
-                        work_stem = None,
+                        source = 'opera',
                         resolution = 100,
                         debug: bool = False,
                         ims_masking: bool = True,
@@ -55,7 +55,7 @@ def retrieve_snow_depth(aoi: shapely.geometry.Polygon,
     Args:
     aoi: Shapely bounding box or [xmin, ymin, xmax, ymax] iterable of desired area to search within
     dates: Start and end date to search between
-    work_dir: filepath to directory to work in. Will be created if not existing
+    source: download from opera project or process using hyp3. One of 'opera' [default] or 'hyp3'
     job_name: [Optional] Name for project file stems otherwise generated from dates
     debug: do you want to get verbose logging?
     ims_masking: do you want to mask pixels by IMS snow free imagery?
@@ -85,6 +85,8 @@ def retrieve_snow_depth(aoi: shapely.geometry.Polygon,
     if outfp is not None:
         outfp = Path(outfp).expanduser().resolve()
         assert outfp.parent.exists(), f"Out filepath {outfp}'s directory does not exist"
+    
+    assert source in ['opera', 'hyp3']
 
     # -- Setting up directories and logging -- #
     work_dir = Path(work_dir)
@@ -94,7 +96,7 @@ def retrieve_snow_depth(aoi: shapely.geometry.Polygon,
     log = logging.getLogger(__name__)
 
     # get main stem for automated file naming
-    work_stem = f'{pd.to_datetime(dates[0]).date()}_{pd.to_datetime(dates[1]).date()}' if work_dir is not None else work_stem
+    # work_stem = f'{pd.to_datetime(dates[0]).date()}_{pd.to_datetime(dates[1]).date()}' if work_dir is not None else work_stem
     
     # -- Downloading S1, FCF, Snowcover -- #
 
@@ -102,7 +104,7 @@ def retrieve_snow_depth(aoi: shapely.geometry.Polygon,
     log.info("Downloading sentinel-1 gamma0 backscatter data")
 
     # get sentinel 1 data search results
-    s1_urls = get_sentinel1_urls(start_date = dates[0], stop_date = dates[1], aoi = aoi)
+    s1_urls = get_sentinel1_urls(start_date = dates[0], stop_date = dates[1], aoi = aoi, source = source)
     # Keep only necessary downloads vv, vh, mask.
     s1_urls = [u for u in s1_urls if u.endswith(('_VV.tif', '_VH.tif', '_mask.tif'))]
     # download sentinel urls
