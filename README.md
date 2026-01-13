@@ -59,7 +59,7 @@ spicy_ds = retrieve_snow_depth(aoi = test_aoi, dates = dates,
                                work_dir = Path('./spicy-test/').resolve(), 
                                resolution = spatial_resolution,
                                debug=False,
-                               source = source
+                               source = source,
                                outfp=out_nc)
 ```
 
