@@ -85,10 +85,15 @@ def run_full_workflow_hyp3():
     assert 'vh' in ds.data_vars
 
 @pytest.mark.integration
-def test_readme_workflow():
+def test_readme_workflow_opera():
     if not os.getenv("RUN_INTEGRATION"):
         pytest.skip("Set RUN_INTEGRATION=1 to run integration tests")
 
     run_full_workflow_opera()
+
+@pytest.mark.integration
+def test_readme_workflow_hyp3():
+    if not os.getenv("RUN_INTEGRATION"):
+        pytest.skip("Set RUN_INTEGRATION=1 to run integration tests")
 
     run_full_workflow_hyp3()
