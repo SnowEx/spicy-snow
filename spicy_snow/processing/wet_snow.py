@@ -174,9 +174,6 @@ def flag_wet_snow(dataset: xr.Dataset) -> Union[None, xr.Dataset]:
         melt_season = (dataset['time.month'] > 1) & (dataset['time.month'] < 8)
 
         # get images of this relative orbit and in the melt season
-        melt_season = (dataset['time.month'] > 1) & (dataset['time.month'] < 8)
-
-        # get images of this relative orbit and in the melt season
         melt_orbit = (melt_season & (dataset.track == orbit))
 
         # check if there are at least 4 time slices in melt season for this orbit
@@ -224,6 +221,6 @@ def flag_wet_snow(dataset: xr.Dataset) -> Union[None, xr.Dataset]:
     # if less than 50% are wet then keep the save value for wet_snow otherwise set to 1
     dataset['wet_snow'] = dataset['wet_snow'].where(dataset['perma_wet'] < 0.5, 1)
 
-    dataset['wet_snow'].loc[dict(time = ts)] = dataset.sel(time = ts)['wet_snow'].where(dataset.sel(time = ts)['snowcover'] == True, 0)
+    dataset['wet_snow'] = dataset['wet_snow'].where(dataset['snowcover'] == True, 0)
 
     return dataset

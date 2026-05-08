@@ -336,8 +336,8 @@ def generate_forest_fraction_dataarray(aoi, ref = None) -> xr.Dataset:
     # first check if in us
     if not within_conus(aoi): 
         log.info(f'AOI outside of CONUS. Using Proba-V datasets')
-        tmp_dir = tempfile.gettempdir()
-        fcf = xr.open_dataarray(download_proba_v(), tmp_dir.joinpath('fcf.tif'))[0]
+        tmp_dir = Path(tempfile.gettempdir())
+        fcf = xr.open_dataarray(download_proba_v(tmp_dir.joinpath('fcf.tif')))[0]
     else: 
         log.info(f'AOI inside of CONUS. NLCD 2021 Forest Cover')
         fcf = get_nlcd(aoi)
