@@ -15,6 +15,10 @@ from pyproj import Transformer
 # opera s1
 import asf_search as asf
 from asf_search import download_url
+from asf_search.constants import INTERNAL as _ASF_INTERNAL
+# Default CMR_TIMEOUT is 30s, which is intermittently too short for
+# long high-latitude winter queries that return 600+ S1 granules.
+_ASF_INTERNAL.CMR_TIMEOUT = 120
 # viirs snow cover
 import earthaccess
 from tqdm import tqdm
