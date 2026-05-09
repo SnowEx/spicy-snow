@@ -17,7 +17,8 @@ import asf_search as asf
 
 # faster reprojection utils
 import rasterio
-from rasterio.warp import reproject, Resampling
+import rioxarray
+from rasterio.warp import reproject, Resampling, transform_bounds
 from rasterio.enums import Resampling as Rsmp
 from rasterio.transform import rowcol
 
@@ -334,11 +335,29 @@ def generate_forest_fraction_dataarray(aoi, ref = None) -> xr.Dataset:
     """
     aoi = validate_aoi(aoi)
     # first check if in us
-    if not within_conus(aoi): 
+    if not within_conus(aoi):
         log.info(f'AOI outside of CONUS. Using Proba-V datasets')
         tmp_dir = Path(tempfile.gettempdir())
-        fcf = xr.open_dataarray(download_proba_v(tmp_dir.joinpath('fcf.tif')))[0]
-    else: 
+        fcf_path = download_proba_v(tmp_dir.joinpath('fcf.tif'))
+        # The Lievens FCF raster is ~3GB global at 100m. Open lazily and
+        # clip to the target area BEFORE any computation, otherwise the
+        # full raster gets loaded into memory and the process is killed.
+        fcf = rioxarray.open_rasterio(fcf_path).squeeze(drop=True)
+        # Build the clip box in EPSG:4326 (FCF native CRS). Prefer the
+        # reprojection target's bounds when available for the tightest crop;
+        # fall back to the AOI bounds.
+        if ref is not None:
+            xmin, ymin, xmax, ymax = transform_bounds(
+                ref.rio.crs, "EPSG:4326", *ref.rio.bounds()
+            )
+        else:
+            xmin, ymin, xmax, ymax = aoi.bounds
+        # Small halo so reproject_match has neighboring pixels available.
+        buf = 0.05  # ~5 km in degrees
+        fcf = fcf.rio.clip_box(
+            minx=xmin - buf, miny=ymin - buf, maxx=xmax + buf, maxy=ymax + buf
+        )
+    else:
         log.info(f'AOI inside of CONUS. NLCD 2021 Forest Cover')
         fcf = get_nlcd(aoi)
 
