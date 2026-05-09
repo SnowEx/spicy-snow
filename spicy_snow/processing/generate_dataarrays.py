@@ -18,7 +18,7 @@ import asf_search as asf
 # faster reprojection utils
 import rasterio
 import rioxarray
-from rasterio.warp import reproject, Resampling, transform_bounds
+from rasterio.warp import reproject, Resampling
 from rasterio.enums import Resampling as Rsmp
 from rasterio.transform import rowcol
 
@@ -135,7 +135,17 @@ def generate_reference_grid(ref_fp, resolution, aoi):
         ref = sel_1point_da_to_2d_array(ref, aoi.y, aoi.x, crs, transform)
     else:
         ref = ref.rio.clip_box(*aoi.bounds).rio.pad_box(*aoi.bounds)
-    
+
+    # Normalize to north-up (descending y) orientation. Some source S1
+    # bursts (e.g. degenerate single-acquisition tracks at the AOI edge)
+    # produce reference grids with ascending y-coords after reproject,
+    # leaving rio.bounds() returning inverted (bottom > top) values that
+    # break downstream clip_box / reproject_match. Flipping the y axis
+    # and refreshing the cached transform yields a self-consistent grid.
+    if ref.sizes.get('y', 0) > 1 and ref.y.values[0] < ref.y.values[-1]:
+        ref = ref.isel(y=slice(None, None, -1))
+        ref = ref.rio.write_transform(ref.rio.transform(recalc=True))
+
     return ref
 
 def generate_sentinel1_dataarray(
@@ -343,16 +353,15 @@ def generate_forest_fraction_dataarray(aoi, ref = None) -> xr.Dataset:
         # clip to the target area BEFORE any computation, otherwise the
         # full raster gets loaded into memory and the process is killed.
         fcf = rioxarray.open_rasterio(fcf_path).squeeze(drop=True)
-        # Build the clip box in EPSG:4326 (FCF native CRS). Prefer the
-        # reprojection target's bounds when available for the tightest crop;
-        # fall back to the AOI bounds.
-        if ref is not None:
-            xmin, ymin, xmax, ymax = transform_bounds(
-                ref.rio.crs, "EPSG:4326", *ref.rio.bounds()
-            )
-        else:
-            xmin, ymin, xmax, ymax = aoi.bounds
+        # Clip in EPSG:4326 (FCF native CRS) using AOI bounds. The ref
+        # grid is also in EPSG:4326 and clipped to aoi.bounds in
+        # generate_reference_grid, so using ref.rio.bounds() here was
+        # equivalent in principle but vulnerable to grids whose cached
+        # transform disagrees with the y-coords (degenerate single-burst
+        # tracks observed at AOI edges) which yielded inverted bounds
+        # and a degenerate clip window.
         # Small halo so reproject_match has neighboring pixels available.
+        xmin, ymin, xmax, ymax = aoi.bounds
         buf = 0.05  # ~5 km in degrees
         fcf = fcf.rio.clip_box(
             minx=xmin - buf, miny=ymin - buf, maxx=xmax + buf, maxy=ymax + buf
