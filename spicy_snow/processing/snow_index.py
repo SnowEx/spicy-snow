@@ -35,20 +35,17 @@ def calc_delta_vv(dataset: xr.Dataset) -> Union[None, xr.Dataset]:
     # get all unique relative orbits
     orbits = np.unique(dataset['track'].values)
 
-    for orbit in orbits:
-        
-        # Calculate change in gamma-vv between previous and current time step from the same relative orbit
-        diffvv = dataset['vv'].sel(time = dataset.track == orbit).diff(dim = 'time')
-        
-        # if adding new 
-        if 'deltavv' not in dataset.data_vars:
-            # add delta-gamma-vv as variable to dataset
-            dataset['deltavv'] = diffvv
-        
-        else:
-            # update deltavv times with this. 
-            dataset['deltavv'].loc[dict(time = diffvv.time)] = diffvv
-    
+    # Build per-orbit deltas, concat, then assign once. The previous
+    # in-place `.loc[time=...]` write pattern dies under numpy 2.x +
+    # newer xarray: the first assignment fills missing time slots with a
+    # broadcast-backed read-only buffer, and subsequent orbit writes
+    # raise "Assignment destination is a view".
+    delta_parts = [
+        dataset['vv'].sel(time = dataset.track == orbit).diff(dim = 'time')
+        for orbit in orbits
+    ]
+    dataset['deltavv'] = xr.concat(delta_parts, dim='time').reindex(time=dataset.time)
+
     return dataset
 
 def calc_delta_cross_ratio(dataset: xr.Dataset, A: float = 2) -> Union[None, xr.Dataset]:
@@ -84,23 +81,16 @@ def calc_delta_cross_ratio(dataset: xr.Dataset, A: float = 2) -> Union[None, xr.
 
     # get all unique relative orbits
     orbits = np.unique(dataset['track'].values)
-    
-    # Identify previous image from the same relative orbit (6, 12, 18, or 24 days ago)
-    for orbit in orbits:
 
-        # Calculate change in gamma-cr between previous and current time step
-        diffCR = gamma_cr.sel(time = dataset.track == orbit).diff(dim = 'time')
-        
-        # add delta-gamma-cr as band to dataset
-        # if adding new 
-        if 'deltaCR' not in dataset.data_vars:
-            # add delta-gamma-CR as new variable to dataset
-            dataset['deltaCR'] = diffCR
-        
-        else:
-            # update deltaCR times with this. 
-            dataset['deltaCR'].loc[dict(time = diffCR.time)] = diffCR
-    
+    # Build per-orbit deltas, concat, then assign once. See calc_delta_vv
+    # above for why the previous in-place `.loc[time=...]` pattern fails
+    # under numpy 2.x + newer xarray.
+    delta_parts = [
+        gamma_cr.sel(time = dataset.track == orbit).diff(dim = 'time')
+        for orbit in orbits
+    ]
+    dataset['deltaCR'] = xr.concat(delta_parts, dim='time').reindex(time=dataset.time)
+
     return dataset
 
 def calc_delta_gamma(dataset: xr.Dataset, B: float = 0.5) -> Union[None, xr.Dataset]:
