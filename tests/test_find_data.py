@@ -36,17 +36,25 @@ def example_results_df():
 # -----------------------------
 @patch("spicy_snow.find_data.earthaccess.search_data")
 def test_find_snowcover_urls(mock_search, example_aoi):
-    # Setup mock
+    # NSIDC's data_links() returns both .h5 granules and .h5.xml metadata
+    # sidecars; find_snowcover_urls should drop the sidecars.
     mock_result = MagicMock()
-    mock_result.data_links.return_value = ['https://example.com/test.A2025001.v1.tif', 'https://example.com/test.A2025002.v1.tif']
+    mock_result.data_links.return_value = [
+        'https://example.com/test.A2025001.v1.h5',
+        'https://example.com/test.A2025001.v1.h5.xml',
+        'https://example.com/test.A2025002.v1.h5',
+    ]
     mock_search.return_value = [mock_result]
 
     urls = fd.find_snowcover_urls(example_aoi, "2025-01-01", "2025-01-02")
-    assert urls == ['https://example.com/test.A2025001.v1.tif', 'https://example.com/test.A2025002.v1.tif']
+    assert urls == [
+        'https://example.com/test.A2025001.v1.h5',
+        'https://example.com/test.A2025002.v1.h5',
+    ]
 
     # Test filtering by date_list
     urls_filtered = fd.find_snowcover_urls(example_aoi, "2025-01-01", "2025-01-02", date_list=["2025-01-01"])
-    assert urls_filtered == ['https://example.com/test.A2025001.v1.tif']
+    assert urls_filtered == ['https://example.com/test.A2025001.v1.h5']
 
 # -----------------------------
 # Tests for get_urls_from_asf_search
