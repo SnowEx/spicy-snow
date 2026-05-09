@@ -18,7 +18,7 @@ import asf_search as asf
 # faster reprojection utils
 import rasterio
 import rioxarray
-from rasterio.warp import reproject, Resampling, transform_bounds
+from rasterio.warp import reproject, Resampling
 from rasterio.enums import Resampling as Rsmp
 from rasterio.transform import rowcol
 
@@ -343,16 +343,13 @@ def generate_forest_fraction_dataarray(aoi, ref = None) -> xr.Dataset:
         # clip to the target area BEFORE any computation, otherwise the
         # full raster gets loaded into memory and the process is killed.
         fcf = rioxarray.open_rasterio(fcf_path).squeeze(drop=True)
-        # Build the clip box in EPSG:4326 (FCF native CRS). Prefer the
-        # reprojection target's bounds when available for the tightest crop;
-        # fall back to the AOI bounds.
-        if ref is not None:
-            xmin, ymin, xmax, ymax = transform_bounds(
-                ref.rio.crs, "EPSG:4326", *ref.rio.bounds()
-            )
-        else:
-            xmin, ymin, xmax, ymax = aoi.bounds
+        # Clip in EPSG:4326 (FCF native CRS) using AOI bounds. The ref grid
+        # is also in EPSG:4326 and clipped to aoi.bounds in
+        # generate_reference_grid, so using ref.rio.bounds() here was
+        # equivalent but vulnerable to pixel-edge / projection round-trip
+        # quirks that produced degenerate windows on some AOIs.
         # Small halo so reproject_match has neighboring pixels available.
+        xmin, ymin, xmax, ymax = aoi.bounds
         buf = 0.05  # ~5 km in degrees
         fcf = fcf.rio.clip_box(
             minx=xmin - buf, miny=ymin - buf, maxx=xmax + buf, maxy=ymax + buf
