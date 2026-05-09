@@ -164,6 +164,13 @@ def retrieve_snow_depth(aoi: shapely.geometry.Polygon,
     # clip outlier values of backscatter to overall mean
     ds = s1_clip_outliers(ds)
 
+    # Materialize into writable in-memory arrays before the snow-index
+    # functions, which do in-place .loc[time=...] writes; without this,
+    # the second orbit's write fails with "assignment destination is
+    # read-only" because earlier ops left the backing buffer non-writeable.
+    # Mirrors the same .load() done in retrieval_from_parameters below.
+    ds = ds.load()
+
     # -- Calulating Snow Index -- #
     log.info("Calculating snow index")
     # calculate delta CR and delta VV
