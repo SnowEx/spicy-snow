@@ -1,6 +1,7 @@
 """
 Functions to search and download Sentinel-1 RTC images for specific geometries and dates
 """
+import re
 from pathlib import Path
 from itertools import chain
 
@@ -9,6 +10,7 @@ import pandas as pd
 import xarray as xr
 import rioxarray as rxa
 import geopandas as gpd
+from pyproj import Transformer
 
 # opera s1
 import asf_search as asf
@@ -24,6 +26,54 @@ from spicy_snow.hyp3_pipeline import hyp3_pipeline
 
 import logging
 log = logging.getLogger(__name__)
+
+
+# MODIS/VIIRS sinusoidal tile grid constants (10 deg per tile at the equator)
+_VIIRS_TILE_SIZE = 1111950.519667
+_VIIRS_SINU_PROJ = (
+    "+proj=sinu +lon_0=0 +x_0=0 +y_0=0 "
+    "+ellps=WGS84 +datum=WGS84 +units=m +no_defs"
+)
+_VIIRS_TILE_RE = re.compile(r"h(\d{2})v(\d{2})")
+
+
+def _viirs_tiles_for_aoi(aoi_bounds):
+    """Return the set of (h, v) MODIS/VIIRS sinusoidal tiles that an AOI
+    bbox (xmin, ymin, xmax, ymax in EPSG:4326) actually intersects.
+
+    Densely samples the AOI boundary in lat/lon, projects each point to
+    sinusoidal, and reads off the tile indices. This is needed because
+    earthaccess's CMR matching uses each granule's WGS84 polygon, which
+    at high latitudes spans vastly wider longitudes than the tile's real
+    coverage (e.g. h20v01 over Asia matches a Fairbanks bbox).
+    """
+    transformer = Transformer.from_crs("EPSG:4326", _VIIRS_SINU_PROJ, always_xy=True)
+    xmin, ymin, xmax, ymax = aoi_bounds
+    n = 30
+    lons = np.concatenate([
+        np.linspace(xmin, xmax, n), np.linspace(xmin, xmax, n),
+        np.full(n, xmin), np.full(n, xmax),
+    ])
+    lats = np.concatenate([
+        np.full(n, ymin), np.full(n, ymax),
+        np.linspace(ymin, ymax, n), np.linspace(ymin, ymax, n),
+    ])
+    sx, sy = transformer.transform(lons, lats)
+    tiles = set()
+    for x, y in zip(sx, sy):
+        if not (np.isfinite(x) and np.isfinite(y)):
+            continue
+        h = int(np.floor(x / _VIIRS_TILE_SIZE + 18))
+        v = int(np.floor(9 - y / _VIIRS_TILE_SIZE))
+        if 0 <= h < 36 and 0 <= v < 18:
+            tiles.add((h, v))
+    return tiles
+
+
+def _viirs_tile_from_url(url):
+    """Parse 'h##v##' tile ID from a VIIRS granule URL; None if absent."""
+    m = _VIIRS_TILE_RE.search(url)
+    return (int(m.group(1)), int(m.group(2))) if m else None
 
 def find_snowcover_urls(aoi, start_date = None, stop_date = None, date_list = None):
     
@@ -43,7 +93,16 @@ def find_snowcover_urls(aoi, start_date = None, stop_date = None, date_list = No
     # data_links() also returns .h5.xml metadata sidecars; keep only the HDF5
     # granules so downstream h5py.File() doesn't choke on the XML files.
     snowcover_urls = [u for u in snowcover_urls if u.endswith('.h5')]
-    
+    # CMR's WGS84 polygon match over-includes tiles at high latitudes;
+    # restrict to URLs whose (h, v) sinusoidal tile actually covers the AOI.
+    needed_tiles = _viirs_tiles_for_aoi(aoi.bounds)
+    snowcover_urls = [u for u in snowcover_urls if _viirs_tile_from_url(u) in needed_tiles]
+    if not snowcover_urls:
+        raise ValueError(
+            f"No VIIRS snowcover tiles intersect AOI {aoi.bounds}; "
+            f"earthaccess returned no .h5 granules in tiles {needed_tiles}."
+        )
+
     if date_list is not None:
         date_list = pd.to_datetime(date_list)
         # extract dates from filenames
