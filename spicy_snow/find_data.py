@@ -40,6 +40,9 @@ def find_snowcover_urls(aoi, start_date = None, stop_date = None, date_list = No
     
     # Flatten all URLs
     snowcover_urls = list(chain.from_iterable([r.data_links() for r in results]))
+    # data_links() also returns .h5.xml metadata sidecars; keep only the HDF5
+    # granules so downstream h5py.File() doesn't choke on the XML files.
+    snowcover_urls = [u for u in snowcover_urls if u.endswith('.h5')]
     
     if date_list is not None:
         date_list = pd.to_datetime(date_list)
