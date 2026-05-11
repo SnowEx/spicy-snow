@@ -278,3 +278,57 @@ def test_delta_cr_errors(test_dataset):
     import pytest
     with pytest.raises(AssertionError):
         calc_delta_cross_ratio(test_dataset)
+
+
+def test_calc_delta_cross_ratio_disjoint_orbits_with_singleton():
+    """Regression test for the read-only-buffer bug (PR #85): orbits with
+    disjoint time sets, including one single-acquisition orbit (T021-style),
+    used to break in-place .loc[time=...] writes under numpy 2.x. Verifies
+    the per-orbit-list + xr.concat path works for these shapes.
+    """
+    times = pd.to_datetime([
+        '2024-10-01', '2024-10-07', '2024-10-13',  # orbit A
+        '2024-10-04', '2024-10-10', '2024-10-16',  # orbit B
+        '2024-11-15',                              # orbit C - single acquisition
+    ])
+    track = np.array([10, 10, 10, 65, 65, 65, 21])
+    n_t = len(times)
+    rng = np.random.default_rng(0)
+    ds = xr.Dataset(
+        {
+            'vv': (('time', 'y', 'x'), rng.normal(-15, 2, (n_t, 3, 4))),
+            'vh': (('time', 'y', 'x'), rng.normal(-22, 2, (n_t, 3, 4))),
+        },
+        coords={
+            'time': times, 'y': [0, 1, 2], 'x': [0, 1, 2, 3],
+            'track': ('time', track),
+        },
+        attrs={'s1_units': 'dB'},
+    )
+
+    out = calc_delta_cross_ratio(ds, A=2)
+
+    # Output exists and aligns to dataset time axis
+    assert 'deltaCR' in out.data_vars
+    assert out['deltaCR'].sizes['time'] == n_t
+
+    # Each orbit's first timestep is NaN (diff drops it). For singleton T021,
+    # the only timestep should also be NaN since there's no previous.
+    is_nan = np.isnan(out['deltaCR'].values).all(axis=(1, 2))  # collapse y,x
+    expected_nan_times = sorted([
+        '2024-10-01', '2024-10-04', '2024-11-15',
+    ])
+    actual_nan_times = sorted(
+        [str(t.date()) for t in pd.to_datetime(out.time.values[is_nan])]
+    )
+    assert actual_nan_times == expected_nan_times
+
+    # Verify a known per-orbit delta: orbit A second timestep
+    A = 2
+    gamma_cr = (A * ds['vh']) - ds['vv']
+    expected_step = (
+        gamma_cr.sel(time='2024-10-07') - gamma_cr.sel(time='2024-10-01')
+    )
+    assert_allclose(
+        out['deltaCR'].sel(time='2024-10-07'), expected_step,
+    )
