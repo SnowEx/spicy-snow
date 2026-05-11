@@ -166,6 +166,55 @@ def test_newly_frozen_assertion(test_ds):
         id_newly_frozen_snow(test_ds.drop_vars(['deltaGamma']))
 
 
+def test_flag_wet_snow_snowcover_mask_applied_to_all_timesteps():
+    """Regression test for the stale-`ts` bug (PR #79): the final snowcover
+    masking line in flag_wet_snow used a loop variable from outside the
+    loop scope, so it only zeroed wet_snow at the last timestep instead of
+    every timestep. Construct a multi-timestep dataset where snowcover is
+    False in different cells per timestep and assert that wet_snow == 0
+    at every (time, y, x) where snowcover is False.
+    """
+    # 6 timesteps over 2 orbits, big enough to get past flag_wet_snow's
+    # >=4 melt-season check
+    times = pd.date_range("2025-02-01", periods=6, freq="6D")
+    n_t = len(times)
+    rng = np.random.default_rng(42)
+    # snowcover varies per timestep: a different cell is "no snow" each step
+    snowcover = np.ones((n_t, 3, 3), dtype=bool)
+    for t in range(n_t):
+        snowcover[t, t % 3, t % 3] = False
+    ds = xr.Dataset(
+        {
+            "deltavv": (("time", "y", "x"), rng.normal(0, 2, (n_t, 3, 3))),
+            "deltaCR": (("time", "y", "x"), rng.normal(0, 2, (n_t, 3, 3))),
+            "deltaGamma": (("time", "y", "x"), rng.normal(0, 1, (n_t, 3, 3))),
+            "snow_index": (("time", "y", "x"), rng.normal(0.2, 0.1, (n_t, 3, 3))),
+            "snowcover": (("time", "y", "x"), snowcover),
+            "fcf": (("y", "x"), np.full((3, 3), 0.5)),
+            "vv": (("time", "y", "x"), rng.normal(-15, 1, (n_t, 3, 3))),
+        },
+        coords={
+            "time": times,
+            "track": ("time", [10, 65, 10, 65, 10, 65]),
+        },
+        attrs={"s1_units": "dB"},
+    )
+    ds = id_newly_wet_snow(ds, wet_thresh=-2)
+    ds = id_wet_negative_si(ds, wet_SI_thresh=0)
+    ds = id_newly_frozen_snow(ds, freeze_thresh=0.5)
+    ds = flag_wet_snow(ds)
+
+    # Every cell with snowcover=False must end up with wet_snow=0 (or NaN
+    # from upstream masking, but never >0).
+    no_snow_mask = ~ds['snowcover'].values
+    wet_at_no_snow = ds['wet_snow'].values[no_snow_mask]
+    nonzero_at_no_snow = wet_at_no_snow[~np.isnan(wet_at_no_snow)] != 0
+    assert not nonzero_at_no_snow.any(), (
+        "wet_snow should be 0 (or NaN) wherever snowcover is False, "
+        "across ALL timesteps — not just the last."
+    )
+
+
 # def test_negative_snow_index_wet(test_ds):
 #     ds = test_ds
 #     ds['snowcover'][0,0,0] = 2

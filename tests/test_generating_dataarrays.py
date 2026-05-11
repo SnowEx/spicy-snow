@@ -82,7 +82,7 @@ def test_convert_snowcover_dates_to_s1_overpasses_missing_date():
 # -----------------------------
 def test_generate_forest_fraction_dataarray_inside_conus(monkeypatch):
     aoi = box(-100, 30, -99, 31)
-    
+
     # Patch download_proba_v to return temporary file
     def fake_download(*args, **kwargs):
         tmp = tempfile.NamedTemporaryFile(suffix=".tif", delete=False)
@@ -90,12 +90,83 @@ def test_generate_forest_fraction_dataarray_inside_conus(monkeypatch):
         da.rio.write_crs("EPSG:4326", inplace=True)
         da.rio.to_raster(tmp.name)
         return tmp.name
-    
+
     monkeypatch.setattr("spicy_snow.utils.download.download_proba_v", fake_download)
-    
+
     da = generate_forest_fraction_dataarray(aoi)
     assert da.max() <= 1
     assert da.min() >= 0
+
+
+def test_generate_forest_fraction_dataarray_outside_conus(monkeypatch, tmp_path):
+    """Regression smoke test for the non-CONUS FCF code path. Catches the
+    'unexercised non-CONUS branch' class of bugs (PRs #79, #80, #85): missing
+    download_proba_v args, eager-load OOM, and clip_box failure modes.
+    """
+    # Alaska AOI — within_conus(aoi) returns False here so the Proba-V
+    # branch in generate_forest_fraction_dataarray runs.
+    aoi = box(-148, 65, -147, 66)
+
+    # Build a small synthetic FCF tif that covers the AOI + buffer in
+    # EPSG:4326 (matches Lievens raster CRS). 0-100 range like the real one.
+    fcf_path = tmp_path / 'fake_fcf.tif'
+    n = 30
+    lats = np.linspace(66.5, 64.5, n)   # descending, north-up
+    lons = np.linspace(-148.5, -146.5, n)
+    rng = np.random.default_rng(7)
+    da = xr.DataArray(
+        rng.uniform(0, 100, (n, n)).astype('float32'),
+        dims=('y', 'x'),
+        coords={'y': lats, 'x': lons},
+    )
+    da = da.rio.write_crs("EPSG:4326")
+    da.rio.to_raster(fcf_path)
+
+    # Mock download_proba_v wherever it's referenced: by name in
+    # utils.download AND as imported into generate_dataarrays (the actual
+    # call site after PR #79). Patching just utils.download wouldn't
+    # affect the already-imported reference in generate_dataarrays.
+    def fake_download(out_fp):
+        # Real download_proba_v writes to out_fp and returns it; mirror that.
+        import shutil
+        shutil.copy(str(fcf_path), str(out_fp))
+        return out_fp
+
+    monkeypatch.setattr(
+        "spicy_snow.processing.generate_dataarrays.download_proba_v",
+        fake_download,
+    )
+
+    # No ref: exercises the AOI-bounds clip_box path
+    out_no_ref = generate_forest_fraction_dataarray(aoi)
+    assert isinstance(out_no_ref, xr.DataArray)
+    assert out_no_ref.max() <= 1
+    assert out_no_ref.min() >= 0
+
+    # With ref: exercises reproject_match path. Use a small synthetic ref
+    # grid in the AOI's lat/lon range.
+    ref = xr.DataArray(
+        np.zeros((10, 10), dtype='float32'),
+        dims=('y', 'x'),
+        coords={
+            'y': np.linspace(65.9, 65.1, 10),  # descending
+            'x': np.linspace(-147.9, -147.1, 10),
+        },
+    ).rio.write_crs("EPSG:4326")
+
+    out_with_ref = generate_forest_fraction_dataarray(aoi, ref=ref)
+    assert isinstance(out_with_ref, xr.DataArray)
+    assert out_with_ref.shape == ref.shape  # reproject_match aligned to ref
+    assert out_with_ref.max() <= 1
+    assert out_with_ref.min() >= 0
+
+
+# Note: a unit test for generate_reference_grid's y-orientation normalization
+# (PR #85) would require faking a Sentinel-1 burst tif with a specific
+# transform/coord inconsistency that arises in production from degenerate
+# single-acquisition tracks. That's hard to construct synthetically without
+# real S1 data; the normalization is defensive and covered implicitly by
+# the post-download pipeline test if its inputs are ever flipped.
 
 # -----------------------------
 # Test validate_aoi and within_conus
