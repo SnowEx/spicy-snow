@@ -126,6 +126,8 @@ def retrieve_snow_depth(aoi: shapely.geometry.Polygon,
 
     # download viirs snow cover fraction for each sentinel 1 overpass date
     snowcover_urls = find_snowcover_urls(start_date = dates[0], stop_date = dates[1], date_list = ds.time.dt.date, aoi = aoi)
+    # recent granules' data_links include .h5.xml metadata sidecars; keep only the .h5 data files
+    snowcover_urls = [u for u in snowcover_urls if u.endswith('.h5')]
     snowcover_fps = download_urls_parallel(snowcover_urls, work_dir.joinpath('snowcover'))
 
     # generate snow cover dataset
