@@ -301,10 +301,10 @@ def generate_snowcover_dataarray(snowcover_fps, ref = None):
     snowcover_da = xr.concat(daily_arrays, dim='time').sortby('time')
     snowcover_da.name = 'snowcover'
 
-    # convert from NASA's sinusoidal project
-    # proj string comes from Table 3 of
-    # https://nsidc.org/sites/default/files/documents/user-guide/multi_vnp10a1f-v002-userguide.pdf
-    src_crs = "+proj=sinu +lon_0=0 +x_0=0 +y_0=0 +ellps=WGS84 +datum=WGS84 +units=m +no_defs"
+    # convert from NASA's sinusoidal projection. Grid is on the MODIS/VIIRS
+    # authalic SPHERE (R=6371007.181 m), NOT WGS84 -- using +ellps=WGS84 here
+    # offsets the reproject ~18 km north at mid-latitudes (meridian-arc vs y=R*lat).
+    src_crs = "+proj=sinu +lon_0=0 +x_0=0 +y_0=0 +a=6371007.181 +b=6371007.181 +units=m +no_defs"
     snowcover_da = snowcover_da.rio.write_crs(src_crs)
 
     if ref is not None:
