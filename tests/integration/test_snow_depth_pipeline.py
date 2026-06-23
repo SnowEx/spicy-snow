@@ -201,6 +201,23 @@ def test_vh_has_finite_values(snow_depth_result):
 
 
 @pytest.mark.integration
+def test_vh_coverage_matches_vv(snow_depth_result):
+    """VH coverage must track VV's.
+
+    A single weak `.any()` check passes even when VH collapses to a fraction of
+    the AOI. On a multi-track AOI the VH reproject-reference bug dropped VH to
+    ~20% of VV coverage; this guards against that regression.
+    """
+    ds, _ = snow_depth_result
+    vv_cov = float(np.isfinite(ds["vv"]).mean())
+    vh_cov = float(np.isfinite(ds["vh"]).mean())
+    assert vh_cov > 0.8 * vv_cov, (
+        f"VH coverage {vh_cov:.0%} far below VV {vv_cov:.0%} "
+        "(VH reproject-reference grid regression)"
+    )
+
+
+@pytest.mark.integration
 def test_vv_in_db_range(snow_depth_result):
     """VV backscatter in dB should be in a reasonable range."""
     ds, _ = snow_depth_result
