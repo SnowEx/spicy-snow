@@ -18,7 +18,8 @@ sys.path.append(expanduser('../'))
 # import functions for downloading
 from spicy_snow.find_data import get_sentinel1_urls, find_snowcover_urls
 from spicy_snow.processing.generate_dataarrays import generate_sentinel1_dataarray,\
-    generate_snowcover_dataarray, generate_forest_fraction_dataarray, convert_snowcover_dates_to_s1_overpasses
+    generate_snowcover_dataarray, generate_forest_fraction_dataarray, convert_snowcover_dates_to_s1_overpasses,\
+    generate_reference_grid
 
 # import functions for pre-processing
 from spicy_snow.processing.s1_preprocessing import s1_orbit_averaging, s1_clip_outliers, ims_water_mask, amplitude_to_dB
@@ -113,13 +114,19 @@ def retrieve_snow_depth(aoi: shapely.geometry.Polygon,
 
     # generate dataset and start to save s1 data vars. Use zarr to reduce memory load for big arrays
     ds = xr.Dataset()
-    ds['vv'] = generate_sentinel1_dataarray(s1_fps, aoi, pol = 'VV', resolution = resolution)
 
-    # grab spatial reference from first time step of VV
+    # build one clean full-AOI reference grid and use it for BOTH pols. Reusing
+    # ds['vv'].isel(time=0) as the VH reference corrupts VH: the
+    # combine_close_images output has a flipped-y coords/transform mismatch that
+    # misplaces the VH reproject grid and silently discards most of the swath.
+    vv_fps = sorted(f for f in s1_fps if f.stem.lower().endswith('vv'))
+    ref_grid = generate_reference_grid(vv_fps[0], resolution, aoi)
+
+    ds['vv'] = generate_sentinel1_dataarray(s1_fps, aoi, pol = 'VV', ref = ref_grid)
+    ds['vh'] = generate_sentinel1_dataarray(s1_fps, aoi, pol = 'VH', ref = ref_grid)
+
+    # grab spatial reference for later resampling of ancillary layers
     spatial_reference = ds['vv'].isel(time = 0)
-
-    # repeat combining and spatial resampling for VH
-    ds['vh'] = generate_sentinel1_dataarray(s1_fps, aoi, pol = 'VH', ref = spatial_reference)
     
     # next VIIRS snowcover #
     log.info("Downloading VIIRS snowcover data")

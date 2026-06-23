@@ -32,7 +32,6 @@ def mosaic_group(sub):
     # sub is a DataArray with 'time' dimension
     merged = reduce(lambda a, b: a.combine_first(b), [sub.isel(time=i) for i in range(sub.sizes['time'])])
     merged = merged.expand_dims(time=[pd.to_datetime(sub['time']).mean()])  # assign average time
-    merged = merged.dropna('x', how = 'all').dropna('y', how = 'all')
     return merged
 
 def combine_close_images(da, time_tol = pd.Timedelta('2min')):
